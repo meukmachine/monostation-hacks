@@ -1,7 +1,8 @@
 # Release test
 
-Run this list on the unit before a build goes on the flasher page. Note the build, the date
-and anything that fails in the release's issue comment.
+Run this list on the unit before a build goes on the flasher page. Tick the boxes here for
+the current test build, with the date and anything that fails; clear them when a new test
+number starts.
 
 Versions stay between 750 and 800, so Components still offers stock 1.2. There is one
 test number at a time (odd), and every test build is rebuilt under it. When it passes this
@@ -66,17 +67,18 @@ Shift + Pattern Settings is Mutate. Use an Osc 1 pattern with notes on about hal
 ## Mod settings (#68)
 
 - [ ] With no store (fresh unit): the unit boots, `7C 03` answers store 0, every setting is at its default. After Reset to stock: store 1 (an empty store), every setting at its default.
-- [ ] Firmware settings tab, Read from unit: both drive sliders listed; moving one is heard at once.
+- [x] Firmware settings tab, Read from unit: all four drive sliders listed; moving one is heard at once (751, 2026-11-21).
 - [ ] Stock firmware: Read from unit says it has no mod settings.
-- [ ] Save, power off and on: the values come back (`7C 03` answers store 1).
+- [x] Save, power off and on: the values come back (`7C 03` answers store 1) (751, 2026-11-21).
 - [ ] Patch and session saves and loads still work after a Save.
 - [ ] Back up: the pack holds `mod-settings.bin` and Components still opens it; Reset to stock, then Send the pack with its settings: the values come back.
-- [ ] CLI: `--settings --set "Overdrive amount=60" --save`, then `--settings` lists 60.
+- [x] CLI: `--settings --set 0x0101=60 --save`, then `--settings` lists 60 (Gradle splits `--args` on spaces, so use the id) (751, 2026-11-21).
 
 ## Drive (#61)
 
 - [ ] Every slider at 0 (the default): Overdrive and Distortion sound stock at every knob setting.
-- [ ] Sliders at 50: as the earlier drive builds (×3); all three distortion types sound distinct. Each Distortion slider changes only its own panel type.
+- [ ] Sliders at 50: as the earlier drive builds (×3); all three distortion types sound distinct.
+- [x] Each Distortion slider changes only its own panel type (751, 2026-11-21).
 - [ ] Sliders at 100: no clicks or dropouts when moving them while a note plays (distortion is already at its most around 50, by ear 2026-11-21).
 
 ## Stock behaviour

@@ -69,7 +69,7 @@ The word sum at `0x20001F00` is written only by `0x71` and `0x72`; nothing reads
 | `+0x24` program word `0x08004B95` | no bounds check; 32-bit parallelism. Addresses only grow from `0x0800C000`, so the bootloader can't be hit. |
 | `+0x2C` unlock `0x08004B55` / `+0x30` lock `0x08004B41` | KEY1/KEY2, `LOCK` bit |
 
-Program errors aren't reported back, and nothing reads the flash back to verify it. Read the image back afterwards (patch memread + `tools/p40dump.py`) when that matters.
+Program errors aren't reported back, and nothing reads the flash back to verify it. Reading the image back needs MCU memory reads, as the removed patch memread did (git history).
 
 ## Consequences
 

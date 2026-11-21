@@ -44,7 +44,7 @@ Build flags (`--fatal-warnings`): `-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mf
 An overlay is checked-in code of ours that replaces stock functions by name. It works on
 the generated tree, so features stay out of the generated source:
 
-    python3 tools/fwsrc.py generate private/firmware/monostation-firmware-800.bin build/fwsrc --overlay overlays/hello
+    python3 tools/fwsrc.py generate private/firmware/monostation-firmware-800.bin build/fwsrc --overlay overlays/drive
     python3 tools/fwsrc.py build build/fwsrc build/fwsrc/firmware.bin
     python3 tools/bin2syx.py build/fwsrc/firmware.bin out.syx --version 801
 
@@ -112,8 +112,9 @@ constructor's vtable stays in use. The overlay has no C++ runtime:
 version and the vtable's two slots change, and g++ compiles `note_sink_note_on` to exactly
 the stock instructions.
 
-`overlays/hello` is the source twin of `patches/hello` (`main` wrapped by a tail call,
-version 801) and `overlays/hello_c` the same in C (`void main(void) { stock_main(); }`,
+The test fixture `tests/fixtures/overlay_hello` is the source twin of the patch
+`tests/fixtures/patch_hello` (`main` wrapped by a tail call, version 801) and
+`overlay_hello_c` the same in C (`void main(void) { stock_main(); }`,
 which gcc makes a `b.w` tail call). `tests/test_fwsrc.py` checks that all three produce the
 same image, the one already run on the device, and that a C `static` variable fails to link.
 They also check that a C++ static constructor fails to link.

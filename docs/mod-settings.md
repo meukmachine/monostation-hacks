@@ -4,7 +4,9 @@ A design (2026-11-21) for one store of settings, tweaks and feature flags shared
 mod, set from the app (`flasher/`, Firmware settings tab in `docs/app-ui.md`). The first user is the
 configurable drive amount (#61). Status: firmware side built (`overlays/settings`,
 `tools/modsettings.py`), tested on the host; app side built (`flasher/` `ModSettings.kt`,
-Firmware settings tab, CLI `--settings`); neither tried on the unit yet.
+Firmware settings tab, CLI `--settings`). On the unit (751, 2026-11-21): reading,
+live sliders (each Distortion slider changes only its own panel type), the CLI, and
+Save from the page with the values back after a power cycle.
 
 ## Decisions (2026-11-21)
 
@@ -75,7 +77,6 @@ settings.
   (4 KB), replies are built at `0x20025000` (512 bytes), the values live at `0x20025200`
   with a magic word tied to the build's table address. Until the store is read (or after a
   reset into another build) `mod_setting` returns defaults.
-- Because it replaces `sysex_dispatch`, it can't go in one build with `overlays/ledtest`.
 - `tests/test_modsettings.py` compiles `settings.c` for the host (`tests/settings_host/`,
   the SRAM3 addresses mapped with `mmap`) and checks the store reading and every SysEx op. Ids are listed in *Ids* below, so two mods never take the same one; the high byte
 is the mod, the low byte the setting.
@@ -104,7 +105,7 @@ test builds and stock firmware (which never reads it).
 
 `F0 00 20 29 01 61 7C <op> … F7`, in the Mono Station family (`docs/sysex-handlers.md`).
 The stock dispatcher doesn't use byte 6 `0x7C`: the earlier drive tuning message took it,
-and `overlays/drive` dropped that message. `0x7D` is `overlays/ledtest`. The reply goes to
+and `overlays/drive` dropped that message. `0x7D` was the removed `overlays/ledtest`. The reply goes to
 the port the request came from.
 
 Encoding: a number of n nibbles is 4-bit values, most significant first (16-bit values as
@@ -162,10 +163,6 @@ host-compiled `settings.c`).
 
 ## Open
 
-- **Boot read on the unit:** the read after `app_construct`'s record read is built and
-  host-tested, not yet tried on a unit.
-- **Upload at `0x7FF000`:** the bootloader reads anywhere up to `0x7FFFF000`, but uploads
-  were tried only on the patch area and the sessions.
 - **Size limits:** how long a description can be in one SysEx (enum labels, text
   defaults).
 - **Firmware writes:** only once a setting has to change from the panel; then through the

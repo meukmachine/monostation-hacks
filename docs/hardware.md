@@ -1,6 +1,6 @@
 # Hardware & memory map
 
-Most of this comes from the decoded application image (`tools/syx2bin.py`). The *read from a unit* notes come from memory dumps taken with patch memread (`patches/memread`, `tools/p40dump.py`).
+Most of this comes from the decoded application image (`tools/syx2bin.py`). The *read from a unit* notes come from memory dumps taken with patch memread (removed 2026-11-21, in git history; `tools/p40dump.py`).
 
 ## MCU
 
@@ -59,7 +59,7 @@ From the code plus the RAM dumps of a running unit (patch memread, `tools/p40dum
 
 **For patch state there are two regions, neither cleared at boot:**
 
-- **CCM from `0x10000000` upward**, for CPU-only state. Keep well clear of the stack at the top: for example, the first 32 KB leaves about 30 KB of margin above the measured 1.1 KB. `overlays/transpose` and `overlays/ledtest` both keep their state at `0x10000000`, so one build can't contain both without moving one of them. `overlays/drive` uses `0x10000400`, `overlays/randomise` `0x10000800`, `overlays/sequences` `0x10000C00`. `overlays/settings` uses SRAM3 `0x20024000`–`0x200253FF` (the store read buffer must be DMA-reachable, `docs/mod-settings.md`).
+- **CCM from `0x10000000` upward**, for CPU-only state. Keep well clear of the stack at the top: for example, the first 32 KB leaves about 30 KB of margin above the measured 1.1 KB. `overlays/transpose` keeps its state at `0x10000000`. `overlays/drive` uses `0x10000400`, `overlays/randomise` `0x10000800`, `overlays/sequences` `0x10000C00`. `overlays/settings` uses SRAM3 `0x20024000`–`0x200253FF` (the store read buffer must be DMA-reachable, `docs/mod-settings.md`).
 - **SRAM3 `0x200235B8`–`0x2002FFFF`**, for buffers that DMA has to reach. It lies past the heap's `_sbrk` limit.
 
 ## Peripherals referenced

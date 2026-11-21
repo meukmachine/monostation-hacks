@@ -77,7 +77,7 @@ There is no display.
 
 #### LED map
 
-Mapped on the unit 2026-10-28 with `overlays/ledtest` and `tools/ledmap.py`. All LEDs are levels in the 352-byte output buffer at `0x200021F8` (`0x200005E0` +8), which `leds_update` turns into the SPI frame. An RGB LED takes three channels; its index is the order of `leds_render_rgb`'s table at `0x08029DCA`.
+Mapped on the unit 2026-10-28 with `overlays/ledtest` and `tools/ledmap.py` (both removed 2026-11-21, in git history). All LEDs are levels in the 352-byte output buffer at `0x200021F8` (`0x200005E0` +8), which `leds_update` turns into the SPI frame. An RGB LED takes three channels; its index is the order of `leds_render_rgb`'s table at `0x08029DCA`.
 
 | RGB LED | Physical |
 |---------|----------|
@@ -265,16 +265,13 @@ Detail: `docs/sequencer.md`, `docs/session-format.md`.
 
 | Name | What it does |
 |------|--------------|
-| `patches/hello`, `overlays/hello`, `overlays/hello_c` | test patches: report version 801 |
-| `patches/memread` | `p 0x40` op 2 also reads MCU memory (bootloader dump, `DBGMCU_IDCODE`, SRAM3) |
+| `tests/fixtures/patch_hello`, `overlay_hello`, `overlay_hello_c` | test fixtures: report version 801 |
 | `overlays/randomise` | #13 per-field Mutate (gate, glide, velocity, pitch), #45 patch randomiser (Mutate in the Patches view: a medium random step from the current patch, gliding over 500 ms) and #60 mild Mutate (steps move one step from where they are, the patch a bit more) |
 | `overlays/transpose` | #21 live transpose of the Osc sequences by scale degrees |
 | `overlays/drive` | stronger Overdrive and Distortion (×3 swing, the overdrive CV `0x20003378` swept to 400, every driven distortion stage at full swing; types 1 and 3 remapped to reach the DAC's end at full Level); how far is set by mod settings (`0x0101` Overdrive, `0x0102`–`0x0104` Distortion per panel type, 0 = stock) |
 | `overlays/settings` | mod settings store (#68): reads the store at `0x7FF000` at boot, `mod_setting(id)`, SysEx `7C` describe/get/set (`docs/mod-settings.md`) |
 | `overlays/sequences` | #20 pattern chain sequences per track (Shift + pattern taps while stopped; Shift + Patterns = Append), saved in the session |
-| `overlays/ledtest` | SysEx `7D` lights chosen LED output channels and blanks the rest (for `tools/ledmap.py`) |
 | `tools/ctllog.py` | turns on the stock debug reports and logs or maps control ids |
-| `tools/ledmap.py` | steps through every LED channel with `overlays/ledtest` and records what lights |
 
 ## Open items collected
 

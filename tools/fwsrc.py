@@ -10,7 +10,7 @@ files.tsv (which address ranges become which .s file; the rest goes into gap_*.s
     python3 tools/fwsrc.py build build/fwsrc build/fwsrc/firmware.bin
     cmp build/fwsrc/firmware.bin private/firmware/monostation-firmware-800.bin
     python3 tools/fwsrc.py coverage        # functions named and listed in docs/source-map.md
-    python3 tools/fwsrc.py generate IMAGE build/fwsrc --overlay overlays/hello   # our code
+    python3 tools/fwsrc.py generate IMAGE build/fwsrc --overlay overlays/drive   # our code
 
 An overlay (overlays/<name>/overlay.toml plus .s files) replaces stock functions by name:
 the stock body stays in place as stock_<name>, the overlay code is linked after the image

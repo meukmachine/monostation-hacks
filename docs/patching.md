@@ -3,7 +3,7 @@
 `tools/fwpatch.py` builds a patched firmware image from assembly source and a declarative hook list. Patches are source, not hex blobs.
 
 ```sh
-python3 tools/fwpatch.py patches/<name> private/firmware/monostation-firmware-800.bin out.bin --syx out.syx
+python3 tools/fwpatch.py PATCH_DIR private/firmware/monostation-firmware-800.bin out.bin --syx out.syx
 ```
 
 It needs GNU binutils for ARM (`apt install binutils-arm-none-eabi`: `as`, `ld`, `objcopy`, `readelf`). If capstone is installed, it also prints a disassembly of each branch site before and after. The tests in `tests/test_fwpatch.py` skip the build tests when binutils or the firmware is missing.
@@ -56,4 +56,4 @@ Every hook needs `expect`, which must be as long as what the hook writes. Hooks 
 
 Encode with `--syx` and send it through the bootloader (`tools/flash.py`, `docs/update-protocol.md`). To go back, reflash stock `monostation-firmware-800.syx`. Bump `version` so the device and Components show that a patched image is running. A `version` below 800 makes Components offer the stock update.
 
-**Tested on hardware:** `patches/hello` (version 801) routes the reset handler's call to main (`0x08025E8E`) through injected code at `0x0802BB20`. Flashed with `tools/flash.py`, the app reported (740, 801), the unit worked normally, and the bootloader's Osc 2 lights showed 801. Stock 800 was then restored the same way. So the bootloader accepts an image longer than stock, and the whole build → flash → verify → restore path works.
+**Tested on hardware:** `patches/hello` (version 801, now the test fixture `tests/fixtures/patch_hello`) routes the reset handler's call to main (`0x08025E8E`) through injected code at `0x0802BB20`. Flashed with `tools/flash.py`, the app reported (740, 801), the unit worked normally, and the bootloader's Osc 2 lights showed 801. Stock 800 was then restored the same way. So the bootloader accepts an image longer than stock, and the whole build → flash → verify → restore path works.

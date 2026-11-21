@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Read memory through the app's 'p' 0x40 op 2 command, 256 bytes per request.
 
-On stock firmware this reads the external SPI flash (addresses below 0x800000). With
-patch memread (patches/memread) the same command also reads MCU memory: flash
-0x08000000-0x080FFFFF (the bootloader is 0x08000000-0x0800BFFF), system memory and OTP,
-option bytes, CCM, SRAM1-3, backup SRAM and (v803) DBGMCU_IDCODE at 0xE0042000.
+On stock firmware this reads the external SPI flash (addresses below 0x800000). The
+patch memread (removed 2026-11-21, in git history) made the same command also read MCU
+memory: flash, system memory and OTP, option bytes, CCM, SRAM1-3, backup SRAM and
+DBGMCU_IDCODE.
 
 Only op 2 (read) is ever sent; ops 0 and 1 erase and program external flash.
 MIDI I/O uses mido + python-rtmidi (imported in main).

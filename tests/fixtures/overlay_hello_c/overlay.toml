@@ -1,0 +1,6 @@
+# C overlay hello world: overlay_hello written in C. gcc turns the call into a tail
+# call (b.w stock_main), so the image equals overlay_hello and patch_hello.
+base = 800
+version = 801
+sources = ["hello.c"]
+replace = ["main"]

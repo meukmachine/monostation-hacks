@@ -12,8 +12,8 @@ import fwsrc  # noqa: E402
 import fwsyx  # noqa: E402
 
 FIRMWARE_800 = ROOT / "private" / "firmware" / "monostation-firmware-800.syx"
-HELLO = ROOT / "overlays" / "hello"
-HELLO_C = ROOT / "overlays" / "hello_c"
+HELLO = ROOT / "tests" / "fixtures" / "overlay_hello"
+HELLO_C = ROOT / "tests" / "fixtures" / "overlay_hello_c"
 RANDOMISE = ROOT / "overlays" / "randomise"
 TRANSPOSE = ROOT / "overlays" / "transpose"
 NOTESINK_CPP = ROOT / "overlays" / "notesink_cpp"
@@ -197,11 +197,11 @@ class Overlay800Test(unittest.TestCase):
         (self.tmp / "stock.bin").write_bytes(self.image)
 
     def test_hello_equals_fwpatch(self):
-        """overlays/hello and patches/hello make the same image: the reset handler's
+        """The hello overlay and the hello patch (tests/fixtures) make the same image: the reset handler's
         bl main reaches the overlay after the image, which tail-calls stock_main."""
         fwsrc.generate(self.tmp / "stock.bin", self.tmp / "src", overlays=[HELLO])
         built = fwsrc.build(self.tmp / "src", self.tmp / "out.bin")
-        patched = fwpatch.build(ROOT / "patches" / "hello", self.image)[0]
+        patched = fwpatch.build(ROOT / "tests" / "fixtures" / "patch_hello", self.image)[0]
         self.assertIsNone(fwsrc.first_difference(built, patched))
         # without the overlay the same tree builds stock again
         fwsrc.generate(self.tmp / "stock.bin", self.tmp / "src")
@@ -215,7 +215,7 @@ class Overlay800Test(unittest.TestCase):
         gives the same image."""
         fwsrc.generate(self.tmp / "stock.bin", self.tmp / "src", overlays=[HELLO_C])
         built = fwsrc.build(self.tmp / "src", self.tmp / "out.bin")
-        patched = fwpatch.build(ROOT / "patches" / "hello", self.image)[0]
+        patched = fwpatch.build(ROOT / "tests" / "fixtures" / "patch_hello", self.image)[0]
         self.assertIsNone(fwsrc.first_difference(built, patched))
 
     @unittest.skipUnless(HAVE_GCC, "arm-none-eabi-gcc not installed")
