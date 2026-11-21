@@ -24,8 +24,10 @@
   .error { color: var(--err); }
   #file-info { overflow-wrap: anywhere; }
   .build { display: grid; grid-template-columns: auto 1fr; column-gap: .5rem; margin: .5rem 0; cursor: pointer; }
-  .build input { grid-row: span 2; margin-top: .35rem; }
+  .build input { grid-row: span 3; align-self: start; margin-top: .35rem; }
   .build span { color: var(--muted); }
+  .build ul { grid-column: 2; margin: .3rem 0 0; padding-left: 1.2rem; }
+  .build li { margin: .15rem 0; }
   button.small { padding: .2rem .75rem; background: transparent; color: var(--fg); border: 1px solid var(--line); }
   .patch-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 2px 12px; max-height: 320px; overflow-y: auto; font-size: 14px; }
   .patch-list label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

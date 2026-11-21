@@ -42,7 +42,7 @@ The category and genre tables come from Components' Circuit-family librarian (mo
 Category and genre are also firmware parameters: ids 0 and 1 in the table at `0x0802A62A` (enum, max 14 and 9, NRPN 2:64 and 2:65; the MIDI PDF lists Category as NRPN 64:2). So they go through the generic param paths (NRPN in/out, patch save and load), but no code fetches ids 0 or 1 directly (`synth_param_get` calls use other ids), and the image holds no category or genre names. The unit has no on-device filter or browser for them.
 
 | 27 | envelope Trigger (`env_retrigger`): firmware param id 2, NRPN 0:73, 0–1, default 0. The MIDI PDF lists it as `Trigger`, 0–1, default 0, and the user guide doesn't mention it. **On hardware (2026-10-25): 1 = retrigger, 0 = legato** (a second key held over the first replays the envelope only at 1). It is the panel's Shift + PWM toggle (light on = 1), and NRPN 0:73 sets it too, both checked by reading the current patch back. To hear it, use a pluck (attack 0, decay ~70, sustain 0); with sustain at maximum both sound the same. |
-| 28–40 | unused: there is no firmware param-table record for patch offsets 19–31. They are `00` in `Initial Patch`, `Classic Mono`, all 64 Roboo patches and all 64 YBC patches. |
+| 28–40 | unused: there is no firmware param-table record for patch offsets 19–31. They are `00` in `Initial Patch`, `Classic Mono`, all 64 Roboo patches, all 64 YBC patches and all 64 of Luke Neptune's soundset. |
 | 41–134 | parameters; 8-bit ones split over two bytes (high 7 bits, then the low bit as `0x00`/`0x40`, see below) — offsets per the community PDF (osc1/osc2 from 41, mixer, filter, env, LFO, distortion, 93–133 mod matrix, 134 selected routing) |
 | 135 | `F7` |
 

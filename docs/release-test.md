@@ -9,6 +9,8 @@ test number at a time (odd), and every test build is rebuilt under it. When it p
 list, the same source is built as test + 1 (even) and released; the next test number is
 test + 2. The flasher page offers the latest release and the current test build.
 Now: test 751, no release yet (the first will be 752).
+What each build does is in `docs/release-notes.md` (linked from the page); update it with
+the page's feature list in `Main.kt` `BUILDS` when a feature changes.
 
 Build:
 

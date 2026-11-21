@@ -10,14 +10,12 @@ import kotlin.test.assertEquals
 
 /** Checks against the private YBC soundpack; skipped when private/ is absent. */
 class PackFileTest {
-    private val ybc = File("../private/YBC-Flippin-Grooves-Circuit.zip")
-    private val packName = "Soundpack/Big City Flippn'Grooves For Mono Station/Big City Flippn'Grooves Pack For Mono Station.monostationpack"
+    private val ybc = File("../private/YBC-Flippin-Grooves-Circuit/Soundpack/Big City Flippn'Grooves For Mono Station/Big City Flippn'Grooves Pack For Mono Station.monostationpack")
 
     @Test
     fun ybcPack() = runTest {
         if (!ybc.exists()) return@runTest
-        val pack = readZip(ybc.readBytes())[packName]!!
-        val files = readZip(pack)
+        val files = readZip(ybc.readBytes())
         assertEquals(setOf("patches.syx", "sessions.syx"), files.keys)
         val sessions = files["sessions.syx"]!!
         val (start, stream) = Storage.decodeTransfer(sessions)

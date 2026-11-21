@@ -57,20 +57,25 @@ private val settingsText = el<HTMLElement>("settings-text")
 private val TABS = listOf("start", "firmware", "settings", "packs", "help")
 
 /** What the page can flash: one of our diffs applied to stock 1.2, or a file as is. */
-private class Build(val title: String, val description: String, val diff: String?)
+private class Build(val title: String, val description: String, val diff: String?, val features: List<String> = emptyList())
+
+private const val RELEASE_NOTES = "https://github.com/meukmachine/monostation-hacks/blob/main/docs/release-notes.md"
 
 /* Builds (docs/release-test.md): the current release and the current test build, which is
- * rebuilt under the same number until it is released as test + 1. */
+ * rebuilt under the same number until it is released as test + 1. Details per build in
+ * docs/release-notes.md. */
 private val BUILDS = listOf(
     Build("Test build (firmware 751)",
-        "Being tested for the first release: it may change or have bugs. Mutate nudges one " +
-            "field in the Velocity, Gate, Glide and Expand views of every track, the notes of both Osc " +
-            "tracks in the dual view, and the patch in the Patches " +
-            "view (gliding to it); held, it repeats (steps once a loop, also the stock shuffle in the Note view; the patch once a beat). Shift + key in the Note or Expand view transposes the Osc tracks live; in the dual view each one on its own. " +
-            "Pattern sequences: while stopped, hold Shift in the Patterns view and tap patterns or chains " +
-            "to play them in that order (Shift + Patterns: Append, lit orange; adds also while playing); saved in the session. " +
-            "Overdrive and per-type Distortion amounts in the Firmware settings tab (stock until changed).",
-        "builds/mods-751.fwdiff"),
+        "Being tested for the first release: it may change or have bugs.",
+        "builds/mods-751.fwdiff",
+        listOf(
+            "Mutate nudges steps a little (velocity, gate, glide, notes in the scale) instead of shuffling them",
+            "Mutate in the Patches view changes the sound a little and glides to it",
+            "Hold Mutate: it repeats, steps once a loop, the patch once a beat",
+            "Shift + key transposes the Osc tracks live",
+            "Pattern sequences: play patterns and chains in your own order, saved in the session",
+            "Overdrive and Distortion amounts, set in the Firmware settings tab (stock until changed)",
+        )),
     Build("Stock firmware 1.2", "Novation's firmware, unchanged: restores the unit.", null),
 )
 
@@ -369,8 +374,17 @@ private fun showBuilds() {
         val text = document.createElement("span")
         text.textContent = b.description
         label.append(radio, title, text)
+        if (b.features.isNotEmpty()) {
+            val list = document.createElement("ul")
+            for (f in b.features) list.appendChild(document.createElement("li").also { it.textContent = f })
+            label.appendChild(list)
+        }
         buildList.appendChild(label)
     }
+    val notes = document.createElement("p")
+    notes.className = "hint"
+    notes.innerHTML = "What each build does, in detail: <a href=\"$RELEASE_NOTES\" target=\"_blank\" rel=\"noopener\">release notes</a>."
+    buildList.appendChild(notes)
 }
 
 private suspend fun loadFile(file: File) {
