@@ -54,7 +54,7 @@ private val settingsSave = el<HTMLButtonElement>("settings-save")
 private val settingsReset = el<HTMLButtonElement>("settings-reset")
 private val settingsProgress = el<HTMLProgressElement>("settings-progress")
 private val settingsText = el<HTMLElement>("settings-text")
-private val TABS = listOf("start", "firmware", "packs", "settings", "help")
+private val TABS = listOf("start", "firmware", "settings", "packs", "help")
 
 /** What the page can flash: one of our diffs applied to stock 1.2, or a file as is. */
 private class Build(val title: String, val description: String, val diff: String?)
@@ -69,7 +69,7 @@ private val BUILDS = listOf(
             "view (gliding to it); held, it repeats (steps once a loop, also the stock shuffle in the Note view; the patch once a beat). Shift + key in the Note or Expand view transposes the Osc tracks live; in the dual view each one on its own. " +
             "Pattern sequences: while stopped, hold Shift in the Patterns view and tap patterns or chains " +
             "to play them in that order (Shift + Patterns: Append, lit orange; adds also while playing); saved in the session. " +
-            "Overdrive and per-type Distortion amounts in the Settings tab (stock until changed).",
+            "Overdrive and per-type Distortion amounts in the Firmware settings tab (stock until changed).",
         "builds/mods-751.fwdiff"),
     Build("Stock firmware 1.2", "Novation's firmware, unchanged: restores the unit.", null),
 )
@@ -484,7 +484,7 @@ fun main() {
     loadSelected(scope)   // a file the browser kept across a reload
 }
 
-/* Settings tab (docs/mod-settings.md): the running build describes its settings over 0x7C,
+/* Firmware settings tab (docs/mod-settings.md): the running build describes its settings over 0x7C,
  * a control change is sent at once, Save writes the store through the bootloader. */
 
 /** The open app port while the tab shows settings; closed before anything uses the bootloader. */

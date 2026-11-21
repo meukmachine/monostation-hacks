@@ -1,10 +1,10 @@
 # Mod settings
 
 A design (2026-11-21) for one store of settings, tweaks and feature flags shared by every
-mod, set from the app (`flasher/`, Settings tab in `docs/app-ui.md`). The first user is the
+mod, set from the app (`flasher/`, Firmware settings tab in `docs/app-ui.md`). The first user is the
 configurable drive amount (#61). Status: firmware side built (`overlays/settings`,
 `tools/modsettings.py`), tested on the host; app side built (`flasher/` `ModSettings.kt`,
-Settings tab, CLI `--settings`); neither tried on the unit yet.
+Firmware settings tab, CLI `--settings`); neither tried on the unit yet.
 
 ## Decisions (2026-11-21)
 
@@ -135,7 +135,7 @@ text a string. Ops 0 and 3 work before the store is read; a set before then answ
 (`ModSettingsTest` checks them against `tools/modsettings.py` and the replies of the
 host-compiled `settings.c`).
 
-- The Settings tab has *Read from unit*: it asks the running build `7C 03`; stock and older
+- The Firmware settings tab has *Read from unit*: it asks the running build `7C 03`; stock and older
   mod builds don't answer within 1 s, and the tab says the firmware has no settings.
   Otherwise it reads every description (`7C 00`) and value (`7C 01`), groups the controls
   by mod (one control per kind) and sends `7C 02` as a control changes; while a slider

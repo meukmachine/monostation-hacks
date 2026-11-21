@@ -43,6 +43,7 @@
   .setting output { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
   .setting .hint { grid-column: 2; }
   nav a[aria-selected="true"] { color: var(--fg); background: var(--box); border-color: var(--line); margin-bottom: -1px; }
+  @media (max-width: 560px) { nav { gap: 0; flex-wrap: wrap; } nav a { padding: .5rem .6rem; white-space: nowrap; } }
   .warn { border-color: #d97706; background: color-mix(in srgb, #d97706 8%, var(--box)); }
   .warn p, .warn li { color: var(--fg); }
   .warn p { margin-top: 0; }
@@ -62,8 +63,8 @@
   <nav>
     <a href="#start" id="tab-link-start">Start</a>
     <a href="#firmware" id="tab-link-firmware">Firmware</a>
+    <a href="#settings" id="tab-link-settings">Firmware settings</a>
     <a href="#packs" id="tab-link-packs">Packs</a>
-    <a href="#settings" id="tab-link-settings">Settings</a>
     <a href="#help" id="tab-link-help">Help</a>
   </nav>
 
@@ -82,9 +83,9 @@
     <p>It puts custom firmware with new features on your Circuit Mono Station.</p>
     <ul>
       <li><a href="#firmware">Firmware</a>: flash a modified firmware, or go back to stock 1.2.</li>
+      <li><a href="#settings">Firmware settings</a>: adjust the mods, such as the drive amounts.</li>
       <li><a href="#packs">Packs</a>: back up patches and sessions, or send a
         <code>.monostationpack</code> to the unit.</li>
-      <li><a href="#settings">Settings</a>: adjust the mods, such as the drive amounts.</li>
     </ul>
     <p class="hint">It all runs in this browser, over USB MIDI; files you choose stay on your
       computer.</p>

@@ -15,7 +15,7 @@ A design for the web app at `flasher/` once it does more than flash firmware.
 | Packs | Patch editor | low | CC/NRPN per parameter (`tools/patchbank.py` `PARAMS`), type-0 current patch, type-1 slot write |
 | Packs | Sequence editor (steps, chains, automation, #20 sequences) | low | session image (`docs/session-format.md`), offline; sent with the session upload |
 | Settings | System settings record (MIDI channels, clock, …) | maybe (#53) | settings record, `docs/session-transport.md` |
-| Settings | Mod settings, tweaks and feature flags: drive amounts (#61) first, later scales #28, microtuning #40, CV #47, MIDI routing #49 | built (#68): page Settings tab and CLI `--settings`, not yet tried on the unit | mod settings store, `docs/mod-settings.md` |
+| Firmware settings | Mod settings, tweaks and feature flags: drive amounts (#61) first, later scales #28, microtuning #40, CV #47, MIDI routing #49 | built (#68): page Firmware settings tab and CLI `--settings`, not yet tried on the unit | mod settings store, `docs/mod-settings.md` |
 
 Out of scope: sample or audio work.
 
@@ -42,9 +42,9 @@ the bootloader, and so do we (see *Decisions (2026-11-21)*).
 │ [logo] Custom firmware for Circuit Mono Station  ● Connected       │
 │ Unofficial. Nothing leaves your browser.      app · firmware 751   │
 │                                               [Connect]            │
-├───────┬──────────┬───────┬──────────┐                                │
-│ Start │ Firmware │ Packs │ Settings │   (tabs; # in URL)             │
-├───────┴──────────┴───────┴──────────┴────────────────────────────────┤
+├───────┬──────────┬───────────────────┬───────┬──────┐              │
+│ Start │ Firmware │ Firmware settings │ Packs │ Help │              │
+├───────┴──────────┴───────────────────┴───────┴──────┴──────────────┤
 │                                                                    │
 │   tab content                                                      │
 │                                                                    │
@@ -145,7 +145,7 @@ Sequences (#20): Osc 1: 1–2, 3, 1–2, 4   Osc 2: …
 - Fields from `docs/session-format.md` (140-byte patterns, automation lanes, chains, the
   #20 sequences at `0x155E0`); `tools/session.py` is the reference decoder.
 
-### Settings tab
+### Firmware settings tab
 
 Mod settings (`docs/mod-settings.md` *In the app*): [Read from unit] asks the running build
 to describe its settings and draws one control per setting, grouped by mod; changes go to
@@ -161,7 +161,7 @@ access; for firmware without settings it says so. Later: the System settings rec
 - **Session upload:** the bootloader `0x77`/`0x79` upload, as Components does.
 - **Backup:** before each upload the app dumps the unit's patches and sessions through
   the bootloader and offers them as a `.monostationpack` download. Ticked by default.
-- **Tabs:** Start / Firmware / Packs / Settings / Help under one device bar and a shared log. The patch
+- **Tabs:** Start / Firmware / Firmware settings / Packs / Help under one device bar and a shared log. The patch
   and sequence editors are views inside Packs, not tabs: they work on the pack's
   contents, and three tabs fit a phone screen.
 - **Name:** "flasher" until packs ship.

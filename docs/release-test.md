@@ -66,7 +66,7 @@ Shift + Pattern Settings is Mutate. Use an Osc 1 pattern with notes on about hal
 ## Mod settings (#68)
 
 - [ ] With no store (fresh unit): the unit boots, `7C 03` answers store 0, every setting is at its default. After Reset to stock: store 1 (an empty store), every setting at its default.
-- [ ] Settings tab, Read from unit: both drive sliders listed; moving one is heard at once.
+- [ ] Firmware settings tab, Read from unit: both drive sliders listed; moving one is heard at once.
 - [ ] Stock firmware: Read from unit says it has no mod settings.
 - [ ] Save, power off and on: the values come back (`7C 03` answers store 1).
 - [ ] Patch and session saves and loads still work after a Save.
