@@ -24,8 +24,14 @@ class WebMidiAccess private constructor(private var access: dynamic) : MidiAcces
     companion object {
         val isSupported: Boolean get() = window.navigator.asDynamic().requestMIDIAccess != undefined
 
+        /** The last access handed out; a new one stops its port log, or each Flash adds a logger. */
+        private var current: WebMidiAccess? = null
+
         /** Asks for MIDI with SysEx (the browser shows a permission prompt). */
-        suspend fun request(): WebMidiAccess = WebMidiAccess(requestAccess())
+        suspend fun request(): WebMidiAccess {
+            current?.detach()
+            return WebMidiAccess(requestAccess()).also { current = it }
+        }
 
         private suspend fun requestAccess(): dynamic {
             val options: dynamic = js("({})")
@@ -53,6 +59,12 @@ class WebMidiAccess private constructor(private var access: dynamic) : MidiAcces
     }
 
     override val name = "Web MIDI"
+
+    /** Stops reporting port changes (the browser keeps firing statechange on old accesses). */
+    private fun detach() {
+        portChange = null
+        access.onstatechange = null
+    }
 
     /** Called for each port connect/disconnect the browser reports (for the log). */
     fun onPortChange(callback: (String) -> Unit) {

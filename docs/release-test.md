@@ -2,7 +2,8 @@
 
 Run this list on the unit before a build goes on the flasher page. Tick the boxes here for
 the current test build, with the date and anything that fails; clear them when a new test
-number starts.
+number starts. Items marked *testers* can't be run here (no Components); the call for
+testers asks for them.
 
 Versions stay between 750 and 800, so Components still offers stock 1.2. There is one
 test number at a time (odd), and every test build is rebuilt under it. When it passes this
@@ -23,8 +24,9 @@ python3 tools/bin2syx.py build/rel/fw.bin private/firmware/mods-N.syx --version 
 
 ## Flash
 
-- [ ] The flasher page flashes it (Firefox): reboot into the bootloader, send, the unit reports N.
-- [ ] Components shows firmware N and offers 1.2 as an update.
+- [x] The flasher page flashes it (Firefox): reboot into the bootloader, send, the unit reports N (751 from the live page, 7 s, 2026-11-21).
+- [ ] Components shows firmware N and offers 1.2 as an update. (Testers: no Components here.)
+- [x] The page works in Chromium too: it finds the unit (751, 2026-11-21).
 
 ## Mild Mutate on steps (#13, #60)
 
@@ -73,7 +75,7 @@ Shift + Pattern Settings is Mutate. Use an Osc 1 pattern with notes on about hal
 - [ ] Stock firmware: Read from unit says it has no mod settings.
 - [x] Save, power off and on: the values come back (`7C 03` answers store 1) (751, 2026-11-21).
 - [ ] Patch and session saves and loads still work after a Save.
-- [ ] Back up: the pack holds `mod-settings.bin` and Components still opens it; Reset to stock, then Send the pack with its settings: the values come back.
+- [ ] Back up: the pack holds `mod-settings.bin` and Components still opens it (testers); Reset to stock, then Send the pack with its settings: the values come back.
 - [x] CLI: `--settings --set 0x0101=60 --save`, then `--settings` lists 60 (Gradle splits `--args` on spaces, so use the id) (751, 2026-11-21).
 
 ## Drive (#61)
@@ -85,11 +87,11 @@ Shift + Pattern Settings is Mutate. Use an Osc 1 pattern with notes on about hal
 
 ## Stock behaviour
 
-- [ ] Sessions: save, load, switch while playing.
-- [ ] Patches: save, load, Initialise (Shift + Patches).
-- [ ] Power off and on: settings and the last session come back.
-- [ ] MIDI clock in and out, DIN and USB; notes in from a keyboard.
+- [x] Sessions: save, load, switch while playing (751, 2026-11-21).
+- [ ] Patches: save, load, Initialise (Shift + Patches). (Save and load pass, 751, 2026-11-21.)
+- [x] Power off and on: settings and the last session come back (751, 2026-11-21).
+- [ ] MIDI clock in and out, DIN and USB; notes in from a keyboard. (Testers: no clock source here.)
 - [ ] CV/gate out and sync out.
-- [ ] Components: read and write a patch, back up sessions.
+- [ ] Components: read and write a patch, back up sessions. (Testers.)
 - [ ] One hour of playing with patterns, Mutate and transpose: no freeze or reset.
-- [ ] Restore stock 1.2 from the flasher page, then the build again.
+- [x] Restore stock 1.2 from the flasher page, then the build again (751, Firefox, 2026-11-21).
