@@ -54,7 +54,7 @@ private val settingsSave = el<HTMLButtonElement>("settings-save")
 private val settingsReset = el<HTMLButtonElement>("settings-reset")
 private val settingsProgress = el<HTMLProgressElement>("settings-progress")
 private val settingsText = el<HTMLElement>("settings-text")
-private val TABS = listOf("firmware", "packs", "settings")
+private val TABS = listOf("start", "firmware", "packs", "settings", "help")
 
 /** What the page can flash: one of our diffs applied to stock 1.2, or a file as is. */
 private class Build(val title: String, val description: String, val diff: String?)
@@ -103,7 +103,7 @@ private fun updateButton() {
 /** Show the tab named in the URL (#packs), else the last one used, else Firmware. */
 private fun showTab() {
     val hash = window.location.hash.removePrefix("#")
-    val tab = if (hash in TABS) hash else (runCatching { window.localStorage.getItem("tab") }.getOrNull()?.takeIf { it in TABS } ?: "firmware")
+    val tab = if (hash in TABS) hash else (runCatching { window.localStorage.getItem("tab") }.getOrNull()?.takeIf { it in TABS } ?: "start")
     runCatching { window.localStorage.setItem("tab", tab) }
     for (t in TABS) {
         el<HTMLElement>("tab-$t").hidden = t != tab

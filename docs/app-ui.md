@@ -39,12 +39,12 @@ the bootloader, and so do we (see *Decisions (2026-11-21)*).
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│ Circuit Mono Station flasher                  ● Connected          │
+│ [logo] Custom firmware for Circuit Mono Station  ● Connected       │
 │ Unofficial. Nothing leaves your browser.      app · firmware 751   │
 │                                               [Connect]            │
-├──────────┬──────────┬──────────┐                                   │
-│ Firmware │ Packs    │ Settings │   (tabs; # in URL)                │
-├──────────┴──────────┴──────────┴───────────────────────────────────┤
+├───────┬──────────┬───────┬──────────┐                                │
+│ Start │ Firmware │ Packs │ Settings │   (tabs; # in URL)             │
+├───────┴──────────┴───────┴──────────┴────────────────────────────────┤
 │                                                                    │
 │   tab content                                                      │
 │                                                                    │
@@ -58,9 +58,9 @@ connected / app running (firmware version from `0x70`) / in bootloader (bootload
 version) / busy (what, with a progress bar). When an action needs the bootloader, the app
 reboots into it and back by itself; the button steps appear only if no unit answers.
 
-**Tabs.** The first visit opens Firmware; afterwards the last tab is remembered. Settings
-has the mod settings. The page keeps the name "flasher" until packs
-ship, then becomes e.g. "Mono Station tools".
+**Tabs.** Start holds the use-at-your-own-risk warning (back up first, stock 1.2 is the way back) and what each tab does; the first visit opens it, afterwards the last tab is remembered. Help, the last tab, covers browsers, a unit that doesn't answer, a failed flash, and where to talk (the Facebook group) or report problems (GitHub issues). Settings
+has the mod settings. The page is titled "Custom firmware for Circuit
+Mono Station, by Meuk Machine", with the Meuk Machine logo.
 
 ### Firmware tab
 
@@ -161,7 +161,7 @@ access; for firmware without settings it says so. Later: the System settings rec
 - **Session upload:** the bootloader `0x77`/`0x79` upload, as Components does.
 - **Backup:** before each upload the app dumps the unit's patches and sessions through
   the bootloader and offers them as a `.monostationpack` download. Ticked by default.
-- **Tabs:** Firmware / Packs / Settings under one device bar and a shared log. The patch
+- **Tabs:** Start / Firmware / Packs / Settings / Help under one device bar and a shared log. The patch
   and sequence editors are views inside Packs, not tabs: they work on the pack's
   contents, and three tabs fit a phone screen.
 - **Name:** "flasher" until packs ship.
@@ -188,6 +188,10 @@ access; for firmware without settings it says so. Later: the System settings rec
   bootloader for patches and sessions alike.
 - **Check:** the bootloader read-back after the upload (no `0x40` check: a `0x40` request
   returns only the current patch).
+- **UI toolkit:** the web page stays plain HTML (`index.html` + Kotlin/JS `Main.kt`);
+  Compose is for the desktop apps (#69) only. Eventually everything moves to Compose
+  Multiplatform, the page included (Wasm), so web and desktop share one UI. Open then: Web
+  MIDI on Wasm (our `MidiAccess` is Kotlin/JS), download size, canvas instead of HTML.
 
 ## Notes for building it
 

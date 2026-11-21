@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mono Station Flasher</title>
+<title>Mono Station Custom Firmware</title>
+<link rel="icon" type="image/png" href="logo.png">
 <style>
   :root { --bg: #fafafa; --fg: #1d1d1f; --muted: #666; --ok: #17803d; --err: #b42318; --box: #fff; --line: #ddd; }
   @media (prefers-color-scheme: dark) {
@@ -42,21 +43,54 @@
   .setting output { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
   .setting .hint { grid-column: 2; }
   nav a[aria-selected="true"] { color: var(--fg); background: var(--box); border-color: var(--line); margin-bottom: -1px; }
+  .warn { border-color: #d97706; background: color-mix(in srgb, #d97706 8%, var(--box)); }
+  .warn p, .warn li { color: var(--fg); }
+  .warn p { margin-top: 0; }
+  .warn ul { margin: .25rem 0 0; padding-left: 1.25rem; }
+  .brand { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+  .brand img { display: block; }
+  .brand h1 { margin: 0; }
+  .brand h1 span { display: block; font-size: .9rem; font-weight: normal; color: var(--muted); }
 </style>
 </head>
 <body>
 <main>
-  <h1>Circuit Mono Station flasher</h1>
-  <p>Unofficial. Flashes modified firmware over USB MIDI. The bootloader is never written, so a
-    failed update can always be retried.</p>
-
+  <header class="brand">
+    <a href="https://github.com/meukmachine"><img src="logo.png" alt="Meuk Machine" width="56" height="56"></a>
+    <h1>Custom firmware for Circuit Mono Station<span>by Meuk Machine</span></h1>
+  </header>
   <nav>
+    <a href="#start" id="tab-link-start">Start</a>
     <a href="#firmware" id="tab-link-firmware">Firmware</a>
     <a href="#packs" id="tab-link-packs">Packs</a>
     <a href="#settings" id="tab-link-settings">Settings</a>
+    <a href="#help" id="tab-link-help">Help</a>
   </nav>
 
-  <div id="tab-firmware">
+  <div id="tab-start" hidden>
+  <section class="warn">
+    <p><strong>Use at your own risk.</strong> This is a community project, not made or
+      supported by Novation. The modified firmware may have bugs; test builds even more so.</p>
+    <ul>
+      <li>Back up your patches and sessions first.</li>
+      <li>A failed flash can always be retried: the bootloader is never written. Stock
+        firmware 1.2 is always one flash away (Components offers it too).</li>
+    </ul>
+  </section>
+  <section>
+    <h2>What this page does</h2>
+    <p>It puts custom firmware with new features on your Circuit Mono Station.</p>
+    <ul>
+      <li><a href="#firmware">Firmware</a>: flash a modified firmware, or go back to stock 1.2.</li>
+      <li><a href="#packs">Packs</a>: back up patches and sessions, or send a
+        <code>.monostationpack</code> to the unit.</li>
+      <li><a href="#settings">Settings</a>: adjust the mods, such as the drive amounts.</li>
+    </ul>
+    <p class="hint">It all runs in this browser, over USB MIDI; files you choose stay on your
+      computer.</p>
+  </section>
+  </div>
+  <div id="tab-firmware" hidden>
   <section>
     <h2>1. Stock firmware</h2>
     <p>Choose Novation's stock firmware 1.2,
@@ -157,6 +191,41 @@
   </section>
   </div>
 
+  <div id="tab-help" hidden>
+  <section>
+    <h2>Which browsers work?</h2>
+    <p>Firefox on the desktop is tested. Chrome, Edge and other Chromium browsers support Web
+      MIDI with SysEx too but are not tested yet. Safari and browsers on iPhone and iPad have
+      no Web MIDI. The browser asks once to allow MIDI access with SysEx; the page needs it
+      to talk to the unit.</p>
+  </section>
+  <section>
+    <h2>The page doesn't find the unit, or the unit doesn't answer</h2>
+    <ul>
+      <li>Use a USB cable that carries data (some only charge) and switch the unit on.</li>
+      <li>Close Components and other MIDI programs; on Windows only one program can use the
+      unit at a time.</li>
+      <li>Firefox on Linux: when the unit restarted while the page was open (switched off and
+      on, or updated by another program) and it no longer answers, quit Firefox completely
+      and start it again. Reloading the page is not enough.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>A flash stopped halfway, or the unit doesn't start</h2>
+    <p>Switch the unit off, hold Scales + Note + Velocity and switch it on: it starts in its
+      bootloader. Then flash again here, or flash Stock 1.2. A firmware update doesn't touch
+      patches and sessions.</p>
+  </section>
+  <section>
+    <h2>Questions, ideas and problems</h2>
+    <p>Talk about this project in the
+      <a href="https://www.facebook.com/groups/2161801177248617">Facebook group</a>.</p>
+    <p>To report a problem, open an issue at
+      <a href="https://github.com/meukmachine/monostation-hacks/issues">github.com/meukmachine/monostation-hacks/issues</a>
+      with the firmware build, your browser and operating system, what you did and what
+      happened, and the text of the log below.</p>
+  </section>
+  </div>
   <section>
     <h2>Log</h2>
     <div id="log"></div>
