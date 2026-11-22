@@ -15,14 +15,14 @@ Each user generates it locally from their own `private/firmware/*.syx`/`.bin` in
 | File | What it is |
 |------|------------|
 | `tools/fwsrc.py` | generator (`generate`), builder (`build`), shift test (`shift`) and function matcher (`match`) |
-| `tools/fetch_toolchain.py` | installs the stock compiler (GCC 5.3.1) into git-ignored `toolchains/` for `match` |
+| `tools/fetch_toolchain.py` | installs the stock compiler (GCC 5.3.1) and the ST zips into git-ignored `toolchains/`; `build` (library and ST code) and `match` need them |
 | `tools/ghidra/ExportLayout.java` | Ghidra post-script that writes `src/layout.tsv` |
 | `src/layout.tsv` | Ghidra's code/data map: addresses, kinds, data refs, function entries; no image bytes |
 | `src/layout-fixes.tsv` | hand corrections applied over it (same line syntax) |
 | `src/files.tsv` | `start end name [evidence]` address ranges, one source file each (see *Files*) |
 | `overlays/<name>/` | our own code: `overlay.toml` plus `.s`/`.c`/`.cpp` files that replace stock functions (see *Overlays*) |
 | `overlays/include/firmware.h` | prototypes of stock functions for C and C++ overlays |
-| `src/symbols.tsv` | `addr name [note]` names from `docs/*.md` (895: every function, plus vectors, vtables and tables; `docs/source-map.md` gives each function's purpose) |
+| `src/symbols.tsv` | `addr name [note]` names from `docs/*.md`: every function, plus vectors, vtables and tables (`docs/source-map.md` gives each function's purpose; `fwsrc.py coverage` counts them) |
 
 ## Usage
 
@@ -37,16 +37,20 @@ deletes `.s` files from an earlier run (first line `@ Generated …`). `--files 
 `generate` and `shift`) uses another file list. `generate --relax` drops branch widths so gas picks them; it is also
 byte-identical on stock and is what code that moves needs (see *Relocation*).
 Build flags (`--fatal-warnings`): `-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard`. Needs
-`binutils-arm-none-eabi`. `tests/test_fwsrc.py` runs the round trip when the firmware is present.
+`binutils-arm-none-eabi` and `python3 tools/fetch_toolchain.py` (the stock toolchain and ST
+sources for *Library code* and *ST libraries*). `tests/test_fwsrc.py` runs the round trip when the firmware is present.
 
 ## Overlays
 
 An overlay is checked-in code of ours that replaces stock functions by name. It works on
 the generated tree, so features stay out of the generated source:
 
-    python3 tools/fwsrc.py generate private/firmware/monostation-firmware-800.bin build/fwsrc --overlay overlays/drive
+    python3 tools/fwsrc.py generate private/firmware/monostation-firmware-800.bin build/fwsrc --overlay overlays/transpose
     python3 tools/fwsrc.py build build/fwsrc build/fwsrc/firmware.bin
-    python3 tools/bin2syx.py build/fwsrc/firmware.bin out.syx --version 801
+    python3 tools/bin2syx.py build/fwsrc/firmware.bin out.syx --version 751
+
+`--version` matches the overlay's `version`. The release build of all mods is in
+`docs/release-test.md`.
 
 `overlays/<name>/overlay.toml`:
 
@@ -107,7 +111,7 @@ constructor's vtable stays in use. The overlay has no C++ runtime:
 - **Nothing that needs the C++ runtime:** no `new`, no exceptions, no `typeid` or
   `dynamic_cast`.
 
-`overlays/notesink_cpp` (version 802) is the proof. It rewrites `NoteSink` (vtable
+`overlays/notesink_cpp` (version 751) is the proof. It rewrites `NoteSink` (vtable
 `0x08027980`, `docs/class-diagram.md`) as a C++ class that implements `INoteSink`. Only the
 version and the vtable's two slots change, and g++ compiles `note_sink_note_on` to exactly
 the stock instructions.
@@ -119,11 +123,12 @@ which gcc makes a `b.w` tail call). `tests/test_fwsrc.py` checks that all three 
 same image, the one already run on the device, and that a C `static` variable fails to link.
 They also check that a C++ static constructor fails to link.
 
-`overlays/randomise` (#13, version 750: below stock 800, so Components offers to restore 1.2) is the first feature: it wraps `ui_button_event`
-so that Mutate in the Velocity, Gate or Glide view randomises only that step field, and
-in the Expand view only the notes' pitch. The
-only stock bytes it changes are the version and the `ui_root` vtable's button-down slot
-(`0x08027B24`).
+`overlays/randomise` (version 751: below stock 800, so Components offers to restore 1.2)
+was the first feature: context-sensitive Mutate (#13, #65, #66), the patch randomiser
+(#45), mild Mutate (#60) and hold-to-repeat. It replaces `ui_button_event`,
+`ui_root_button_up`, `input_poll_task` and `seq_step_advance`; its `overlay.toml` describes
+the behaviour, and `test_randomise_hooks_button_down` (`tests/test_fwsrc.py`) lists the
+stock bytes it changes.
 
 To regenerate the layout after Ghidra changes:
 
@@ -174,16 +179,9 @@ A constant cast such as `((uint8_t *)0x20002517)` lets the compiler fold offsets
 `p[1]` gets a second literal `0x20002518` (`USBD_GetString` matches only with the
 symbol).
 
-**Specialised library code.** The STM32 Standard Peripheral Library functions match
-their published source, with changes that look like a link-time optimiser specialising
-each function for its callers:
-- `NVIC_Init` has no `NVIC_IRQChannelCmd` check and no subpriority.
-- `TIM_OC2Init` ignores `TIM_OCPolarity`.
-- `TIM_DeInit` inlines `RCC_APBxPeriphResetCmd(p, ENABLE)` and tail-calls separate
-  `DISABLE` copies (`RCC_APB1PeriphResetCmd_off`, `RCC_APB2PeriphResetCmd_off`).
-
-To match, the source is written in the specialised form. The init-struct enums load
-with `ldrb`, so they are one byte. `GPIO_Init` matches only when they are enum types
+**Specialised library code.** Some ST functions were specialised for their callers by
+LTO (*ST libraries*); to match one, the source is written in the specialised form. The
+init-struct enums load with `ldrb`, so they are one byte. `GPIO_Init` matches only when they are enum types
 (`enum __attribute__((packed))`), not `uint8_t`. A `uint8_t` field may alias the
 register stores, so GCC loads `GPIO_Mode` twice.
 
@@ -194,18 +192,11 @@ gives `movs` at every `-O` level, and `ite cc` or `ite hi`. These stubs probably
 from another compiler or from hand-written assembly. Until that is known, they stay
 assembly.
 
-**Compiler version.** With `-Os`, arm-none-eabi-g++ 13.2 compiles `NoteSink::note_on` to
-the stock bytes, but `note_off` gets the same instructions with the registers allocated
-differently (`ldr r3, [r0, #8]` first in stock, `mov r3, r0` first in 13.2), whatever
-the source wording. A full match needs the GCC version the stock was built with.
-
-That version is **GNU Tools for ARM Embedded Processors 5-2016-q1-update** (GCC 5.3.1
-20160307, `gcc-arm-none-eabi-5_3-2016q1`). We searched the image for the newlib-nano
-`.text` sections (relocations masked) of the `thumb/v7e-m/fpv4-sp/hard` multilib from
-nine releases, 4.9-2015q3 through 7-2018q2. Only 5_3-2016q1 matches all of them:
-5_2-2015q4 lacks its `__swsetup_r`, `__swhatbuf_r`, `__smakebuf_r` and `__sputc_r`, and
-both 5_4 releases lack its `_malloc_r` and `_free_r`. GCC 6 and 7 match far fewer bytes.
-With this compiler both NoteSink functions match. `python3 tools/fetch_toolchain.py`
+**Compiler version.** The stock compiler is **GNU Tools for ARM Embedded Processors
+5-2016-q1-update** (GCC 5.3.1 20160307, `gcc-arm-none-eabi-5_3-2016q1`); a newer GCC
+allocates registers differently. It is the only one of nine releases (4.9-2015q3 through
+7-2018q2) whose newlib-nano `.text` sections (`thumb/v7e-m/fpv4-sp/hard`, relocations
+masked) are all in the image. `python3 tools/fetch_toolchain.py`
 downloads it from Launchpad
 (`https://launchpad.net/gcc-arm-embedded/5.0/5-2016-q1-update`, Linux x86-64), checks
 Launchpad's MD5 and unpacks it into git-ignored `toolchains/`; `match` then uses it by
@@ -310,8 +301,10 @@ functions stay generated:
   propagation specialised some functions for their only caller. `NVIC_Init` lost its
   `IRQChannelCmd` check and its sub-priority. `DMA_Init` has the constant `0x400` folded
   in. `TIM_OC2Init`, `TIM_DeInit` and the RCC `.part` clones
-  (`RCC_APB1PeriphResetCmd_off`) are specialised in the same way. ST's source alone cannot
-  reproduce them, and the build uses no LTO.
+  (`RCC_APB1PeriphResetCmd_off`) are specialised in the same way: `TIM_OC2Init` ignores
+  `TIM_OCPolarity`; `TIM_DeInit` inlines `RCC_APBxPeriphResetCmd(p, ENABLE)` and
+  tail-calls the `DISABLE` copies. ST's source alone
+  cannot reproduce them, and the build uses no LTO.
 - **Version.** The stock USB code predates V2.2.1: its `USB_OTG_EPDeactivate` still
   clears `DAINTMSK`. The plan is to move the firmware fully to V2.2.1 later, which
   changes those functions' bytes.
@@ -356,14 +349,15 @@ source-file names:
 | `libc_memchr` | `0800C230`–`0800C2D0` | newlib's assembly `memchr` (a plain `.text` section, linked before every `.text.*`) |
 | `syscalls` | `0801EEAC`–`0801EEFC` | newlib stubs `_read` … `_close` |
 | `stm32f4xx_it` | `08023A78`–`08024070` | IRQ and fault handlers, in ST's `stm32f4xx_it.c` order reversed (`NMI_Handler` last) |
-| app files | `0800C2D0`–`08025E60` (60 ranges) | app code between linker input sections: each starts after a `00 00` linker fill that follows code (see below); named for their content, listed in `docs/source-map.md` |
+| app files | `0800C2D0`–`08025E60` (63 ranges) | app code between linker input sections: each starts after a `00 00` linker fill that follows code (see below); named for their content, listed in `docs/source-map.md` |
+| ST functions | in the app range (40 ranges) | one file per ST function (*ST libraries*) |
 | `startup` | `08025E60`–`08025EAC` | `Reset_Handler` + `Default_Handler` (CMSIS `startup_stm32f4xx.s`) |
 | `libstdcxx_*`, `libc_*` | `08025EAC`–`08026D94` | one file per library object (`docs/firmware-map.md` *Runtime libraries*) |
 | `rodata` | `08026D94`–`0802AE2C` | app constant data; `D_08026D94` is read by app code |
 | `rodata_libstdcxx_nothrow`, `rodata_libc_*` | `0802AE2C`–`0802AEC8` | `std::nothrow`, locale `"C"`, `_global_impure_ptr`, `__sf_fake_*`, printf strings |
 | `crti` | `0802AEC8`–`0802AEE0` | `_init`, `_fini` (newlib crti/crtn) |
 | `init_array_crtbegin`, `init_array`, `fini_array` | `0802AEE0`–`0802AEEC` | `frame_dummy`; one static constructor (`0x080256F4`); `__do_global_dtors_aux` |
-| `data` | `0802AEEC`–`0802BAA0` | `.data` load image (`_sidata`); `Reset_Handler` copies `0x0802AEEC`–`0x0802BB04` to `0x20000000`–`0x20000C18` |
+| `data`, `data_pre_apbahb`, `data_apbahbpresctable`, `data_b` | `0802AEEC`–`0802BAA0` | `.data` load image (`_sidata`); `Reset_Handler` copies `0x0802AEEC`–`0x0802BB04` to `0x20000000`–`0x20000C18`. ST's `APBAHBPrescTable` (`0802B606`) is its own file, linked from source; the 2 bytes before it end the first part 4-aligned |
 | `data_libc_impure` | `0802BAA0`–`0802BB04` | `impure_data` and `_impure_ptr` at the end of `.data` |
 | `image_tail` | `0802BB04`–`0802BB20` | 28 unexplained bytes up to the image end |
 
@@ -392,19 +386,20 @@ Rules, checked by `generate`:
   these after branch relaxation, so they also hold in `--relax` builds. Data alignment
   inside a biased piece is `.fill`/`.space` of `((bias + (. - B)) & 2)` bytes. Gas does not
   count `.short` as an instruction of an IT block, so the rest of such a block is emitted
-  as `.inst` (14 instructions on firmware 800). A clue to the real compile units: an
+  as `.inst` (17 instructions on firmware 800). A clue to the real compile units: an
   object with a literal pool starts and ends 4-aligned. Another: `stm32f4xx_it.c`'s
   handlers appear in reverse source order, so GCC probably emitted every unit's functions
   last to first.
 - **Input sections.** The linker fills the gap before a 4-aligned input section with
-  `00 00`; gas pads inside a section with `00 bf` (`nop`). 58 app functions follow code
-  plus a `00 00` fill, so each starts a new input section and an app file; the other two
-  app files start after `crtbegin` and `stm32f4xx_it`. 4 follow a `00 bf` pad
+  `00 00`; gas pads inside a section with `00 bf` (`nop`). Most app files (56 on firmware
+  800, `app_main` after `memchr` among them) start after code plus a `00 00` fill, so each
+  starts a new input section; `soft_timers` starts after `stm32f4xx_it`, and 6 app files
+  after an ST function. 4 functions follow a `00 bf` pad
   (`main`, `0x080114C0`, `recorder_on_cell`, `session_ctl_patch_write`), so one section
   holds several functions: the app was built without `-ffunction-sections`, and an
   input section is a whole compile unit. A boundary into a 2-aligned section, or at an
   address already 4-aligned, leaves no pad, so an app file can hold several units. The
-  first, `app_main` (`0x0800C230`), runs 25.6 KB to `0x0801264C` with no pad.
+  first, `app_main` (`0x0800C2D0`), runs 25.5 KB to `0x0801264C` with no pad.
 
 ## Classes
 
@@ -419,12 +414,12 @@ one file merge. Classes are named after their vtable (`vt_<class>`); a function 
 when its name starts with its class name. C, HAL and newlib code keeps its `files.tsv`
 file. `generate` fails on a line whose address is not a function entry with that name.
 The crossing rules above apply between pieces: a literal load into another piece of the
-same file is an error too. Firmware 800: 301 functions in 63 classes, 158 files, 289
+same file is an error too. Firmware 800 (2026-11-22): 285 functions in 62 classes, 141 files, 271
 sections, byte-identical in both modes. `--classes FILE` on `generate` and `shift`
 replaces the list (an absent file means none).
 
-A split into 829 files, one per function where these rules allow, also builds
-byte-identical in both modes and passes the shift test.
+A split into one file per function where these rules allow (829 files, 2026-10-26) also
+built byte-identical in both modes and passed the shift test.
 
 ## Relocation
 
@@ -473,7 +468,5 @@ lines, not meaning: an insert inside a data structure (a table, the header) pass
   `python3 tools/fwsrc.py coverage [--list]` counts both, and a test keeps them complete.
   Rename in both files together.
 - **Features.** The generated tree is thrown away and regenerated, so features live in
-  overlays (see *Overlays*), in `.s` or C. `firmware.h` holds few prototypes yet; add them
-  as arguments are pinned down.
-- **Toolchain hint.** newlib crti `_init`/`_fini` sit at `0x0802AEC8`/`0x0802AED4`, which
-  points to arm-none-eabi-gcc. That matters for a matching C decompilation later.
+  overlays (see *Overlays*), in `.s`, C or C++. `firmware.h` has prototypes only for the
+  stock functions overlays call so far; add them as arguments are pinned down.

@@ -4,8 +4,8 @@ New features for the Novation Circuit Mono Station, built on top of Novation's o
 firmware 1.2, plus the reverse-engineering tools and notes that make them possible.
 
 - **Flash the mods from your browser:** [meukmachine.github.io/monostation-hacks](https://meukmachine.github.io/monostation-hacks/)
-  (Firefox; you choose Novation's stock firmware 1.2 file and the page builds the modded
-  firmware from it).
+  (Firefox or a Chromium-based browser on the desktop; you choose Novation's stock
+  firmware 1.2 file and the page builds the modded firmware from it).
 - **Discussion and announcements:** the Facebook group
   [Novation Circuit Mono Station Users](https://www.facebook.com/groups/2161801177248617).
 
@@ -111,9 +111,12 @@ This mod is `overlays/transpose`.
 
 ## Feature: stronger drive (#61)
 
-Overdrive and Distortion go further than stock: turned up, they clip harder and the
-three distortion types differ more. At 0 they sound as stock. This mod is
-`overlays/drive`.
+Overdrive and Distortion can go further than stock: turned up, they clip harder and the
+three distortion types differ more. How far is set with four sliders, 0–100, in the
+flasher page's **Firmware settings** tab: one for Overdrive and one per panel distortion
+type. 0 is stock (the default), 50 the boost of the first drive builds, 100 twice that.
+Changes are heard at once; Save keeps them across power-off (`docs/mod-settings.md`).
+This mod is `overlays/drive`.
 
 ## Feature: pattern sequences (#20)
 
@@ -133,12 +136,11 @@ instant switch. Sequences are saved with the session. This mod is `overlays/sequ
 
 ## Firmware versions
 
-Firmware 1.2 is build 800 inside the firmware. Our releases have even numbers from
-**750** up; the build being tested for the next release has the odd number after the
-latest release. The flasher page offers both: the latest release, and the test build if
-you want to try what's coming (it may change or have bugs).
-They stay below 800 on purpose: Components offers an update to any unit below 800, so
-it offers to put stock 1.2 back.
+Firmware 1.2 is build 800 inside the firmware. Our builds stay below 800 on purpose:
+Components offers an update to any unit below 800, so it offers to put stock 1.2 back.
+The flasher page offers the latest release and the current test build (it may change or
+have bugs). Numbering rules: [docs/release-test.md](docs/release-test.md); what each
+build does: [docs/release-notes.md](docs/release-notes.md).
 
 ## What you need
 
@@ -151,21 +153,25 @@ it offers to put stock 1.2 back.
       python3 -m venv .venv
       .venv/bin/pip install mido python-rtmidi
 
-- The stock firmware 1.2, `monostation-firmware-800.syx`. It ships inside Novation
-  Components 1.72.5 (`resources/app.asar`; on Windows the installer holds
-  `Components-1.72.5-full.nupkg`, which holds `lib/net45/resources/app.asar`). Unpack it
-  with an asar extractor and copy the file to `private/firmware/`. Don't run the installer to get
-  it; unpack it with `7z`.
+- The stock firmware 1.2, `monostation-firmware-800.syx`, in `private/firmware/`. It
+  ships inside Novation Components; where to find it:
+  [docs/firmware-versions.md](docs/firmware-versions.md). Unpack the installer with `7z`;
+  don't run it.
 
 ## Quick start
 
 The [flasher page](https://meukmachine.github.io/monostation-hacks/) is the easy way. To
-build the modded firmware yourself (all mods; leave out an `--overlay` to drop one):
+build the modded firmware yourself (all mods, the build command of
+[docs/release-test.md](docs/release-test.md) with version 751):
 
     python3 tools/syx2bin.py private/firmware/monostation-firmware-800.syx private/firmware/monostation-firmware-800.bin
-    python3 tools/fwsrc.py generate private/firmware/monostation-firmware-800.bin build/mods --overlay overlays/randomise --overlay overlays/transpose --overlay overlays/drive --overlay overlays/sequences --version 751
+    python3 tools/fwsrc.py generate private/firmware/monostation-firmware-800.bin build/mods --overlay overlays/settings --overlay overlays/randomise --overlay overlays/transpose --overlay overlays/drive --overlay overlays/sequences --version 751
     python3 tools/fwsrc.py build build/mods build/mods/firmware.bin
     python3 tools/bin2syx.py build/mods/firmware.bin private/firmware/mods-751.syx --version 751
+
+To drop a mod, leave out its `--overlay`, but mind the dependencies: `drive` needs
+`settings` (`fwsrc.py` refuses it without), and `sequences`' Shift + Patterns (Append)
+needs `randomise`.
 
 Flash it:
 
@@ -187,10 +193,11 @@ accept its firmware update, or flash it the same way:
 
 `tools/fwsrc.py` turns the stock image into Thumb-2 assembly that rebuilds byte for byte.
 An **overlay** replaces stock functions by name with your own C or assembly; the original
-stays callable as `stock_<name>`. The Mutate feature is one small C file:
-`overlays/randomise/randomise.c`, with prototypes of stock functions in
-`overlays/include/firmware.h`. See `docs/source-build.md` (*Overlays*) for the format and
-`docs/source-map.md` for what each stock function does.
+stays callable as `stock_<name>`. A short example is `overlays/drive/drive.c` (one
+replaced function, settings read with `mod_setting`); `overlays/notesink_cpp` shows a C++
+overlay, and `overlays/include/firmware.h` has prototypes of stock functions. See
+`docs/source-build.md` (*Overlays*) for the format and `docs/source-map.md` for what each
+stock function does.
 
 Generated source is Novation's code: it stays in the git-ignored `build/` directory, and
 the firmware and other copyrighted files in the git-ignored `private/` directory. Never
@@ -203,7 +210,13 @@ commit them.
 | `tools/syx2bin.py`, `tools/bin2syx.py` | firmware `.syx` ⇄ raw image (`docs/firmware-container.md`) |
 | `tools/fwsrc.py` | generate and rebuild firmware source, with overlays (`docs/source-build.md`) |
 | `tools/fwpatch.py` | apply small assembly patches with hooks (`docs/patching.md`) |
+| `tools/fwdiff.py` | make, apply and show the firmware diffs the flasher page ships (`docs/firmware-diff.md`) |
+| `tools/modsettings.py` | list overlay settings, build and decode a mod settings store (`docs/mod-settings.md`) |
+| `tools/fetch_toolchain.py` | install the stock compiler (GCC 5.3.1) and ST libraries into `toolchains/` (`docs/source-build.md`) |
 | `tools/flash.py` | flash a `.syx` through the bootloader and verify it (`docs/update-protocol.md`) |
+| `tools/ctllog.py` | turn on the stock debug reports; log or map control ids (`docs/inventory.md`) |
+| `tools/p40dump.py` | read external flash with `p 0x40` op 2 (`docs/sysex-handlers.md`) |
+| `tools/hwtest_slots.py` | hardware test of patch slots 64–127 (`docs/hw-test-patch-slots.md`) |
 | `tools/patchbank.py` | list and decode patches in `.monostationpack` banks (`docs/sysex-spec.md`) |
 | `tools/sessionsyx.py`, `tools/session.py` | split, rebuild and inspect session dumps (`docs/session-transport.md`, `docs/session-format.md`) |
 | `tools/fwmap.py`, `tools/disasm.py`, `tools/ghidra/` | firmware map, quick disassembly, Ghidra headless scripts |
@@ -212,8 +225,9 @@ commit them.
 
 For owners:
 
+- [Release notes](docs/release-notes.md): what each build on the flasher page does.
 - [Official firmware versions](docs/firmware-versions.md): 1.0, 1.1 and 1.2, their build
-  numbers and what each added.
+  numbers, what each added and where the 1.2 file comes from.
 - [Release test](docs/release-test.md): what we check on a unit before a build goes on
   the flasher page.
 - [Entering the bootloader by hand](docs/update-protocol.md#entering-the-bootloader-by-hand)
@@ -229,13 +243,21 @@ For owners:
 For modders:
 
 - [Firmware source build](docs/source-build.md): generating source and writing overlays.
-- [Source map](docs/source-map.md): what each stock function does.
+- [Source map](docs/source-map.md): what each stock function does;
+  [class diagram](docs/class-diagram.md): the C++ classes behind the vtables.
+- [Inventory](docs/inventory.md): every control, circuit and firmware feature, and how far
+  each is understood.
+- [Mod settings](docs/mod-settings.md): the settings store overlays read, and its SysEx.
+- [Firmware diffs](docs/firmware-diff.md): how the flasher page ships builds without
+  Novation's bytes; [app UI](docs/app-ui.md): the flasher page's layout.
 - [Sequencer](docs/sequencer.md): clock, patterns, note routing.
 - [Hardware](docs/hardware.md): MCU, memory map, flash sectors, free RAM.
 - [Bootloader](docs/bootloader.md), [update protocol](docs/update-protocol.md) and
   [firmware container](docs/firmware-container.md): how firmware gets onto the unit.
 - [Binary patching](docs/patching.md), [SysEx handlers](docs/sysex-handlers.md),
   [firmware map](docs/firmware-map.md).
+- [Bass Station II patch SysEx](docs/bass-station-ii.md): reference only, not a Mono
+  Station format.
 - [GitHub issues](https://github.com/meukmachine/monostation-hacks/issues): feature work (`enhancement`) and open research (`research`).
 
 ## Tests

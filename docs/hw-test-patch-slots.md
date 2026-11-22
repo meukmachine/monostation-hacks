@@ -1,13 +1,13 @@
 # Hardware test: patch slots 64–127 (#5)
 
-The firmware's patch store has 128 slots (`docs/sysex-spec.md`, *Patch store*), but the panel and Components use only 64. This plan checks on a real unit what is stored in slots 64–127 and whether program change and SysEx can reach them. Tests 1–3 only read. Tests 4–5 write, but only to slot 64, which the panel can't reach.
+The firmware's patch store has 128 slots (`docs/sysex-spec.md`, *Patch store*), but the panel and Components use only 64. This plan checks on a real unit what is stored in slots 64–127 and whether program change and SysEx can reach them. Tests 1–3 and 5 only read. Test 4 writes, but only to slot 64, which the panel can't reach.
 
 ## Automated run
 
 `tools/hwtest_slots.py` runs tests 0–3 and needs `pip install mido python-rtmidi`; it works on Linux and Windows. Test 4 (write) and test 5 (request) stay manual.
 
 ```sh
-python3 tools/hwtest_slots.py ~/ms-dumps            # --port NAME, --channel N, --skip-session-backup, --skip-trigger, --skip-pc
+python3 tools/hwtest_slots.py ~/ms-dumps            # --port NAME, --channel N, --idle SECONDS, --skip-session-backup, --skip-trigger, --skip-pc
 ```
 
 What the script does:
@@ -23,7 +23,7 @@ What the script does:
 
 On Linux the dumps are read from the ALSA rawmidi device (`/dev/snd/midiC*D*`, found through `/proc/asound`), like `amidi`. Through the sequencer, a session dump lost blocks to input overruns. The script polls the device before sending each request, because rawmidi input starts only on the first poll or read. The dumps and `report.json` are written to the output directory. The manual steps below do the same with `amidi`.
 
-**Results (2026-10-25):** slots 64–127 all hold `Initial Patch`. Test 4 showed that **PC ≥ 64 doesn't load the flash slot**: with `Min 3rd` written to slot 64, PC 64 still loaded the built-in `Initial Patch`. Test 5: only `40 00` answers, with the current patch. Trigger: 1 = retrigger, 0 = legato. Details are in `docs/sysex-spec.md` and #5.
+**Results (2026-10-25):** the 128-slot dump (test 1) works. Slots 64–127 all hold `Initial Patch`. Test 4 showed that **PC ≥ 64 doesn't load the flash slot**: with `Min 3rd` written to slot 64, PC 64 still loaded the built-in `Initial Patch`. Test 5: only `40 00` answers, with the current patch. Trigger: 1 = retrigger, 0 = legato. Details are in `docs/sysex-spec.md` and #5.
 
 ## Setup
 
@@ -66,7 +66,7 @@ amidi -p $P -S 'F0 00 20 29 00 78 00 00 00 00 02 00 00 00 00 00 00 01 00 00 00 0
 ```
 
 Result:
-- **A `0x77` header echoing start `0x2000` and length `0x10000`, followed by blocks and a CRC trailer**: the dump handler takes any range. This also answers the open question in `docs/session-transport.md`. Go to *Reading the slots* below.
+- **A `0x77` header echoing start `0x2000` and length `0x10000`, followed by blocks and a CRC trailer**: the dump handler takes any range (the result on the unit; `docs/session-transport.md` records the ranges tried). Go to *Reading the slots* below.
 - **No reply, or a reply that is still 64 slots long**: the handler limits the range. Use test 2 instead.
 
 ## 2. Fallback: read the hidden region with `p 0x40` op 2
@@ -172,6 +172,5 @@ Run `40 00` (slot 0) first as a control. **Result:** `40 00` returns the current
 
 ## Write the results into
 
-- #5: contents of slots 64–127, the dump range limit, program change 64, and the outcomes of the slot write and the request;
-- #56: whether other start/length values are accepted;
+- #5: contents of slots 64–127, the dump range (any start and length work, recorded in `docs/session-transport.md`), program change 64, and the outcomes of the slot write and the request;
 - `docs/sysex-spec.md`: whether the `0x40` request works, and (byte 27) what Trigger 0 and 1 do (`report.json` → `tests.trigger`).

@@ -23,7 +23,7 @@ Base `0x08000000`. STM32F4 sector layout: sectors 0–3 = 16 KB, sector 4 = 64 K
 |--------|-------|-------|
 | Bootloader | `0x08000000`–`0x0800BFFF` (48 KB, sectors 0–2) | Not in the firmware file, and an app update never writes it. Dumped from a unit: `private/firmware/bootloader-740.bin` (`docs/bootloader.md`). Code ends at `0x08007003`; the rest is erased. |
 | Application | `0x0800C000`–`0x0802BB20` (129,824 bytes) | The decoded image. Occupies sector 3 (16 KB @ `0x0800C000`), sector 4 (64 KB @ `0x08010000`) and part of sector 5 (128 KB @ `0x08020000`). |
-| Free | `0x0802BB20`–`0x0807FFFF` | Erased (`FF`) on a unit (read from a unit). Patch code goes here (`docs/patching.md`). |
+| Free | `0x0802BB20`–`0x0807FFFF` | Erased (`FF`) on a unit (read from a unit). Overlay code goes here (`docs/source-build.md` *Overlays*; legacy patches: `docs/patching.md`), up to the bootloader's erase limit `0x08080000` (`docs/bootloader.md`). |
 
 The application load base `0x0800C000` is confirmed: the reset vector (`0x08025E61`) disassembles to the standard CMSIS `.data`-copy + `.bss`-zero startup, and 39 vector-table entries share one default handler at `0x08025EA9` (`b .`), which lands exactly on a branch-to-self at this base.
 
@@ -40,16 +40,16 @@ From the startup routine's literal pool (`0x08025E94`+):
 
 ### Free RAM
 
-From the code plus the RAM dumps of a running unit (patch memread, `tools/p40dump.py`, `~/ms-dumps/`):
+From the code plus the RAM dumps of a running unit (patch memread, `tools/p40dump.py`; the dumps aren't kept in the repo):
 
 - **SRAM has no free space.**
   - Code loads RAM addresses only up to the `.bss` end `0x200035B8` (capstone scan of `ldr` literals and `movw`/`movt` over every function). Everything above is reached through pointers.
-  - Above `.bss` is the newlib-nano heap. `_sbrk` is `FUN_0801eebc`, its pointer is `.data` `0x20000774` (initial value `0x200035B8`), and its limit is `0x200235B8`, which is the heap start + 128 KB rather than the end of SRAM.
-  - `operator new` is `FUN_08025ec0`, with 241 call sites, mostly in the constructors `FUN_0800e1f8` and `FUN_0800fb5c`. `free` is called only by stdio, so the heap only grows.
+  - Above `.bss` is the newlib-nano heap. `_sbrk` is `0x0801EEBC`, its pointer is `.data` `0x20000774` (initial value `0x200035B8`), and its limit is `0x200235B8`, which is the heap start + 128 KB rather than the end of SRAM.
+  - `operator new` is `0x08025EC0`, with 241 call sites, mostly in the constructors `app_construct` and `ui_construct`. `free` is called only by stdio, so the heap only grows.
   - The biggest block is 94,056 bytes (`0x16F68`, allocated at `0x0800E672`), at `0x20004078`–`0x2001AFE0` in the dump. The ~70 KB zero run at `0x20004986`–`0x20016511` lies inside it: allocated, just zero at the time of the dump.
   - Walking the heap chunk headers from `0x200035B8` gives 537 chunks that end exactly at `0x20020000`.
   - The heap continues into SRAM3: 678 chunks in total, ending exactly at the live `_sbrk` pointer `0x20020DFC`. That pointer had the same value in two dumps from separate boots (firmware 802 and 803).
-- **SRAM3 above the heap is free.** `0x20020DFC`–`0x2002FFFF` holds power-on noise (about 7.95 bits/byte), never written. `_sbrk` would let the heap grow up to `0x200235B8`, but nothing seen so far grows it after boot. Some `new` callers outside the constructors (`FUN_08014c48`, `FUN_08014d88`, `FUN_08015be8`, `FUN_08020ea0`, `FUN_08020fa0`, `FUN_08021128`, `FUN_080214bc`, `FUN_08023324`, `FUN_08025aa0`, `FUN_08025b7c`) aren't traced yet. **`0x200235B8`–`0x2002FFFF` (51,784 bytes) is out of the heap's reach and DMA-accessible.** It isn't cleared at boot either.
+- **SRAM3 above the heap is free.** `0x20020DFC`–`0x2002FFFF` holds power-on noise (about 7.95 bits/byte), never written. `_sbrk` would let the heap grow up to `0x200235B8`, but nothing seen so far grows it after boot. Some `new` callers outside the constructors (`cell_new`, `view_base_ctor`, `led_buffer_ctor`, `player_new`, `merger_new`, `recorder_new`, `track_patterns_new`, `clock_timestamps_new`, `keyboard_view_ctor`, `glide_view_ctor`) aren't traced yet. **`0x200235B8`–`0x2002FFFF` (51,784 bytes) is out of the heap's reach and DMA-accessible.** It isn't cleared at boot either.
 - **CCM is free apart from the stack.**
   - Main copies and clears a CCM `.data`/`.bss` pair whose limits are all `0x10000000` (literals at `0x0800C990`–`0x0800C9A0`), so nothing is placed there statically. Main's literal is the only code reference to CCM.
   - In the dump, `0x10000000`–`0x1000FBBF` holds high-entropy power-on noise (about 7.6 bits/byte), which has never been written since power-on. Plausible stack words (`0`, small values, flash/RAM/CCM pointers) start at `0x1000FBC0`.

@@ -88,6 +88,18 @@ The full table is `tools/bassstation2_params.tsv`. Summary:
 
 Bytes 59–67, 88–90 and 93 hold no named parameter.
 
+## Compared with the Mono Station firmware
+
+`kD` is Bass Station II's parameter array, not the Mono Station's, so differences are expected. The Mono Station firmware 800 table at `0x0802A62A` (`docs/session-format.md` *Lane → parameter*) differs from `kD` in places. For example, filter reso is CC 71 on the Mono Station but CC 82 in `kD`, and osc1 pw is CC 39 on the Mono Station but CC 74 in `kD`. The two do not describe the same parameter set: `kD` has a sub oscillator, a second LFO, a mod envelope and aftertouch routings, while firmware 800 has one envelope, one LFO and the MIDI PDF's layout. They agree by CC only on a subset:
+- mixer CC 20–25 (+32);
+- cutoff CC 16, overdrive CC 114, filter shape CC 84;
+- amp envelope CC 90–93;
+- LFO wave CC 88 and rate CC 18;
+- osc coarse/fine CC 27/26 and 30/29;
+- sync CC 110, distortion CC 94.
+
+The shared CCs reflect Novation's common CC layout across synths. For the Mono Station, the firmware tables are the reference (`tools/patchbank.py` `PARAMS`).
+
 ## Overlays
 
 `overlayIndex` (1–80 in the TSV) indexes the AFX overlay map, which marks the parameters a key overlay overrides (`hasOverlay`, `clearOverlay`, `initOverlaysFromCurrentPatch`). It plays no part in decoding a single patch.

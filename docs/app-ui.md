@@ -6,16 +6,16 @@ A design for the web app at `flasher/` once it does more than flash firmware.
 
 | Area | Feature | Priority | Device path |
 |------|---------|----------|-------------|
-| Firmware | Flash a build (release, test build, stock 1.2) | done (#63) | bootloader, `docs/update-protocol.md` |
-| Packs | Upload a `.monostationpack`: its patches, its sessions, or both | patches: done, CLI and page (Firefox) tried on the unit; sessions: done, CLI and page (Firefox) tried on the unit (session 1 and INIT, 11 s, read-back matches) | bootloader `0x77`/`0x79` upload of slots 1–64 (`docs/session-transport.md` *Upload*), for patches and sessions |
+| Firmware | Flash a build (the release once there is one, the test build, stock 1.2) | done (#63) | bootloader, `docs/update-protocol.md` |
+| Packs | Upload a `.monostationpack`: its patches, its sessions, or both | patches: done, CLI and page (Firefox) tried on the unit; sessions: done, CLI and page (Firefox) tried on the unit (session 1 and INIT, 11 s, read-back matches) | bootloader `0x77`/`0x79` upload of slots 1–64 (`docs/session-transport.md` *Requesting and sending*), for patches and sessions |
 | Packs | Single-patch `.syx` and single-session files | next | as above |
-| Packs | Back up the unit (64 patches, 32 sessions) to a `.monostationpack` | done: CLI and page (Firefox) tried on the unit (#1) | bootloader `0x78` dump: patches at `0x2000`, sessions at `0x12000` |
+| Packs | Back up the unit (64 patches, 32 sessions, the mod settings store) to a `.monostationpack` | done: CLI and page (Firefox) tried on the unit (#1) | bootloader `0x78` dump: patches at `0x2000`, sessions at `0x12000` |
 | Packs | Read one session from the unit | later (#56) | bootloader `0x78` takes any start and length |
 | Packs | Slots 64–127, once the panel can reach them | later (#5, #27) | type-1 slot write (works on slot 64) |
 | Packs | Patch editor | low | CC/NRPN per parameter (`tools/patchbank.py` `PARAMS`), type-0 current patch, type-1 slot write |
 | Packs | Sequence editor (steps, chains, automation, #20 sequences) | low | session image (`docs/session-format.md`), offline; sent with the session upload |
 | Settings | System settings record (MIDI channels, clock, …) | maybe (#53) | settings record, `docs/session-transport.md` |
-| Firmware settings | Mod settings, tweaks and feature flags: drive amounts (#61) first, later scales #28, microtuning #40, CV #47, MIDI routing #49 | built (#68): page Firmware settings tab and CLI `--settings`, not yet tried on the unit | mod settings store, `docs/mod-settings.md` |
+| Firmware settings | Mod settings, tweaks and feature flags: drive amounts (#61) first, later scales #28, microtuning #40, CV #47, MIDI routing #49 | built (#68): page Firmware settings tab and CLI `--settings`, tried on the unit (751, 2026-11-21) | mod settings store, `docs/mod-settings.md` |
 
 Out of scope: sample or audio work.
 
@@ -23,7 +23,8 @@ Out of scope: sample or audio work.
 
 A `.monostationpack` is a ZIP holding `patches.syx` (64 × 136-byte patches) and/or
 `sessions.syx` (a session dump, `docs/session-transport.md`); Components accepts either
-one alone (`frontend/utils/monostation/is-v1-pack`). Components sends a whole pack through
+one alone (`frontend/utils/monostation/is-v1-pack`). Our backups add `mod-settings.bin`
+(the mod settings store, `Backup.kt`) when the unit has one; Components ignores it. Components sends a whole pack through
 the bootloader, and so do we (see *Decisions (2026-11-21)*).
 
 ## Principles
@@ -58,17 +59,19 @@ connected / app running (firmware version from `0x70`) / in bootloader (bootload
 version) / busy (what, with a progress bar). When an action needs the bootloader, the app
 reboots into it and back by itself; the button steps appear only if no unit answers.
 
-**Tabs.** Start holds the use-at-your-own-risk warning (back up first, stock 1.2 is the way back) and what each tab does; the first visit opens it, afterwards the last tab is remembered. Help, the last tab, covers browsers, a unit that doesn't answer, a failed flash, and where to talk (the Facebook group) or report problems (GitHub issues). Settings
+**Tabs.** Start holds the use-at-your-own-risk warning (back up first, stock 1.2 is the way back) and what each tab does; the first visit opens it, afterwards the last tab is remembered. Help, the last tab, covers browsers, a unit that doesn't answer, a failed flash, and where to talk (the Facebook group) or report problems (GitHub issues). Firmware settings
 has the mod settings. The page is titled "Custom firmware for Circuit
 Mono Station, by Meuk Machine", with the Meuk Machine logo.
 
 ### Firmware tab
 
-The current page, unchanged in content:
+The current page (`Main.kt` `BUILDS`; no release yet, so only the test build and stock):
 
 ```
 1. Stock firmware     [Choose monostation-firmware-800.syx]  ✓ stock 1.2
-2. Build              ○ Mods 752 (release)   ○ Test 753   ○ Stock 1.2
+2. Build              ○ Test build (firmware 751)
+                        • feature list, one line per mod
+                      ○ Stock firmware 1.2
 3.                    [Flash]   ████████░░░░ 2900 / 4250
 ```
 
@@ -82,7 +85,7 @@ built; until then the tab is the library alone. A link can open a view directly
 
 ```
 [Choose .monostationpack / .syx]  Roboo.monostationpack: 64 patches, no sessions
-[Back up unit…]  → monostation-backup-2026-11-19.monostationpack
+[Back up unit…]  → monostation-backup-2026-11-21.monostationpack
 
  Patches                                        Sessions
 ┌ File ─────────────────┐  ┌ Unit ───────────┐  ┌ File ──────┐  ┌ Unit ──────┐
@@ -156,8 +159,8 @@ access; for firmware without settings it says so. Later: the System settings rec
 
 ## Decisions (2026-11-19)
 
-- **Patch upload:** type-1 slot writes to the running app, one per slot. No reboot;
-  partial packs and single patches are easy.
+- **Patch upload** (superseded 2026-11-21): type-1 slot writes to the running app, one
+  per slot. No reboot; partial packs and single patches are easy.
 - **Session upload:** the bootloader `0x77`/`0x79` upload, as Components does.
 - **Backup:** before each upload the app dumps the unit's patches and sessions through
   the bootloader and offers them as a `.monostationpack` download. Ticked by default.
@@ -176,8 +179,8 @@ access; for firmware without settings it says so. Later: the System settings rec
   is per platform: `DecompressionStream`/`CompressionStream` (`deflate-raw`) in the
   browser, `java.util.zip` on the JVM.
 - **Placement:** "same slots" or "from slot N" only; drag-and-drop later.
-- **Check:** after the slot writes, request each written slot with type `0x40` in the
-  app and compare. No reboot.
+- **Check** (superseded 2026-11-21): after the slot writes, request each written slot with
+  type `0x40` in the app and compare. No reboot.
 
 ## Decisions (2026-11-21)
 

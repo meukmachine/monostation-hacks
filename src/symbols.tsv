@@ -197,7 +197,7 @@
 0801a5ac usb_endpoint_stop
 0801a830 usb_soft_disconnect
 0801abec jump_to_image
-08024940 bootloader_handover
+08024940 irq_quiesce
 0801ac30 app_header_valid
 0801ac7c header_version
 
@@ -225,7 +225,7 @@
 080270c4 vt_midiout_transport
 080270e0 vt_midiout_clock
 080270ec vt_player_source_adapter
-080270fc vt_recorder_track0
+080270fc vt_track_recorder
 08027154 vt_rec_hub
 08027180 vt_note_adapter
 08027190 vt_transport_source_adapter

@@ -229,7 +229,7 @@ class Overlay800Test(unittest.TestCase):
         slots = (0x1BB24, 0x1BB28, 0x1F128)
         calls = (0xAF54, 0xB034, 0xB16E)
         self.assertLessEqual(changed, {0x1B0, 0x1B1} | {s + k for s in slots + calls for k in range(4)})
-        self.assertEqual(built[0x1B0:0x1B2], b"\x50\x07")
+        self.assertEqual(built[0x1B0:0x1B2], b"\x51\x07")
         for s in slots:
             target = int.from_bytes(built[s:s + 4], "little")
             self.assertEqual(target & 1, 1)
@@ -300,7 +300,7 @@ class Overlay800Test(unittest.TestCase):
         changed = {i for i in range(len(self.image)) if built[i] != self.image[i]}
         vtable = 0x08027980 - 0x0800C000
         self.assertLessEqual(changed, {0x1B0, 0x1B1} | set(range(vtable, vtable + 8)))
-        self.assertEqual(built[0x1B0:0x1B2], b"\x02\x08")
+        self.assertEqual(built[0x1B0:0x1B2], b"\x51\x07")
         on = int.from_bytes(built[vtable:vtable + 4], "little") - 1
         stock_on = int.from_bytes(self.image[vtable:vtable + 4], "little") - 1
         self.assertGreaterEqual(on, 0x0802BB20)

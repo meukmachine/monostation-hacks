@@ -39,6 +39,7 @@ There is no system reset, so peripheral state carries over. That includes the ru
 |-------|-----------|---------------------------|
 | `1` | bootloader, just before it jumps to the app | ordinary boot (anything except `2` boots the app) |
 | `2` | app, on SysEx `0x71`/`0x60` (`docs/sysex-handlers.md`) | stay in the bootloader for an update |
+| `0` | app, once at startup (`power_calib_task`, `docs/sysex-handlers.md`) | boots the app (not `2`) |
 
 The bootloader never clears `2` itself. It goes back to `1` on the next jump to the app (after `0x73` or `0x61`; the Play button presumably takes the same path, which isn't traced).
 
@@ -57,7 +58,7 @@ Messages starting `F0 00 20 29 01 61` (Mono Station patch traffic) are ignored. 
 | `0x76` | Only 24-byte messages: something with an external-flash checksum, not the firmware trailer. The `0x76` trailer of a `.syx` (a shorter message) is ignored. |
 | `0x78` | External-flash dump: `0x77` header, `0x79` blocks, `0x7A` CRC-32 (`FUN_08004a30`, reflected polynomial `EDB88320`). |
 
-The word sum at `0x20001F00` is written only by `0x71` and `0x72`; nothing reads it. **So the firmware checksum is never verified**, and that is why our flasher (`tools/flash.py`) can skip the trailer.
+The word sum at `0x20001F00` is written only by `0x71` and `0x72`; nothing reads it. **So the firmware checksum is never verified**, and that is why our flashers (`tools/flash.py`, `flasher/` `Session.kt`) can skip the trailer.
 
 ## Flash driver (object at `0x200003DC`)
 
@@ -73,7 +74,7 @@ Program errors aren't reported back, and nothing reads the flash back to verify 
 
 ## Consequences
 
-- **Maximum app image: `0x0800C000`–`0x0807FFFF` = 475,136 bytes (464 KiB).** Anything past that is programmed into unerased flash and fails silently. `tools/flash.py` and `tools/fwpatch.py` enforce the same limit (`FLASH_END = 0x08080000`).
-- The bootloader checks only the `00 7F` bytes in `0x71`, the 44-byte length of each block and the header tag; it **never checks a checksum**. `tools/flash.py`'s checks are the only real ones.
+- **Maximum app image: `0x0800C000`–`0x0807FFFF` = 475,136 bytes (464 KiB).** Anything past that is programmed into unerased flash and fails silently. `tools/flash.py`, `tools/fwpatch.py`, `tools/fwsrc.py` (overlay linker `ASSERT`) and `flasher/` `Firmware.kt` enforce the same limit (`FLASH_END = 0x08080000`).
+- The bootloader checks only the `00 7F` bytes in `0x71`, the 44-byte length of each block and the header tag; it **never checks a checksum**. Our flashers' file checks (`tools/flash.py`, `flasher/` `Firmware.kt` `checkSyx`) are the only real ones.
 - Recovery is always possible while the bootloader is intact. The button check runs before the app is touched, and an erased or invalid app keeps the unit in the bootloader. An app that is valid but crashes still lets you hold the buttons at power-on.
 - An interrupted upload leaves sectors 3–7 erased or partly written. The SP word at `0x0800C000` is written last (`0x73`), so it stays `FFFFFFFF`, the app counts as invalid, and the unit stays in the bootloader. Reflash to recover.

@@ -6,7 +6,7 @@ This supersedes the community PDF (`CircuitMonoStationPatchSysExFormat.pdf`, rev
 - the patch model, `frontend/models/monostation/patch`;
 - the validator, `frontend/utils/monostation/validate-patch-sysex`, which accepts exactly 136 bytes.
 
-> **Not Mono Station:** the "154-byte modern wire", the "122-byte legacy wire", the `kD` parameter array and the `RX`/`OX`/`UX` codec all belong to Components' **Bass Station II** modules (`docs/bass-station-ii.md`). They are kept as a reference in `docs/bass-station-ii.md` and `tools/bassstation2_patch.py`.
+> **Not Mono Station:** the "154-byte modern wire", the "122-byte legacy wire", the `kD` parameter array and the `RX`/`OX`/`UX` codec all belong to Components' **Bass Station II** modules. They are kept as a reference in `docs/bass-station-ii.md` and `tools/bassstation2_patch.py`.
 
 The Mono Station **device id (bytes 4–5) is `01 61`** (validator `yte`: `t[4]===1 && t[5]===97`; confirmed by the bank and the firmware). The original Novation **Circuit** uses `01 60`, and Bass Station II uses `00 33`.
 
@@ -32,32 +32,46 @@ Per 136-byte message:
 | 0–3 | `F0 00 20 29` |
 | 4–5 | `01 61` device id |
 | 6 | message type: `0` = current patch, `1` = slot write/dump |
-| 7 | slot index (0–63 in a bank) |
+| 7 | slot index (0–63 in a bank; the firmware accepts < `0x80`, *Patch store*) |
 | 8 | `00` |
 | 9–24 | patch name, 16 ASCII, space-padded |
 | 25 | category index: 0 None, 1 Arp, 2 Bass, 3 Bell, 4 Classic, 5 Drum, 6 Keyboard, 7 Lead, 8 Movement, 9 Pad, 10 Poly, 11 SFX, 12 String, 13 User, 14 Voc/Tune |
 | 26 | genre index: 0 None, 1 Classic, 2 D&B/Breaks, 3 House, 4 Industrial, 5 Jazz, 6 R&B/HHop, 7 Rock/Pop, 8 Techno, 9 Dubstep |
-
-The category and genre tables come from Components' Circuit-family librarian (modules `frontend/constants/circuit/patch-categories` and `patch-genres`, JS names `mP`/`gP`; the sidebar binds `categoryOptions=mP`, `genreOptions=gP`). The similar lists `kR`/`Wte` (`Motion`, `User 1`, `User 2`) belong to Peak, not the Circuit family. Real packs use the field loosely: Roboo tags its basses `1` (Arp) and its drums `3` (Bell), the YBC banks use only 0–3, and every genre seen is `0`. Treat the byte as a free user tag, not a reliable description of the sound.
-Category and genre are also firmware parameters: ids 0 and 1 in the table at `0x0802A62A` (enum, max 14 and 9, NRPN 2:64 and 2:65; the MIDI PDF lists Category as NRPN 64:2). So they go through the generic param paths (NRPN in/out, patch save and load), but no code fetches ids 0 or 1 directly (`synth_param_get` calls use other ids), and the image holds no category or genre names. The unit has no on-device filter or browser for them.
-
-| 27 | envelope Trigger (`env_retrigger`): firmware param id 2, NRPN 0:73, 0–1, default 0. The MIDI PDF lists it as `Trigger`, 0–1, default 0, and the user guide doesn't mention it. **On hardware (2026-10-25): 1 = retrigger, 0 = legato** (a second key held over the first replays the envelope only at 1). It is the panel's Shift + PWM toggle (light on = 1), and NRPN 0:73 sets it too, both checked by reading the current patch back. To hear it, use a pluck (attack 0, decay ~70, sustain 0); with sustain at maximum both sound the same. |
+| 27 | envelope re-trigger (*Patch bytes the PDF does not name*) |
 | 28–40 | unused: there is no firmware param-table record for patch offsets 19–31. They are `00` in `Initial Patch`, `Classic Mono`, all 64 Roboo patches, all 64 YBC patches and all 64 of Luke Neptune's soundset. |
 | 41–134 | parameters; 8-bit ones split over two bytes (high 7 bits, then the low bit as `0x00`/`0x40`, see below) — offsets per the community PDF (osc1/osc2 from 41, mixer, filter, env, LFO, distortion, 93–133 mod matrix, 134 selected routing) |
 | 135 | `F7` |
 
+The category and genre tables come from Components' Circuit-family librarian (modules `frontend/constants/circuit/patch-categories` and `patch-genres`, JS names `mP`/`gP`; the sidebar binds `categoryOptions=mP`, `genreOptions=gP`). The similar lists `kR`/`Wte` (`Motion`, `User 1`, `User 2`) belong to Peak, not the Circuit family. Real packs use the field loosely: Roboo tags its basses `1` (Arp) and its drums `3` (Bell), the YBC banks use only 0–3, and every genre seen is `0`. Treat the byte as a free user tag, not a reliable description of the sound.
+Category and genre are also firmware parameters: ids 0 and 1 in the table at `0x0802A62A` (enum, max 14 and 9, NRPN 2:64 and 2:65; the MIDI PDF lists Category as NRPN 64:2). So they go through the generic param paths (NRPN in/out, patch save and load), but no code fetches ids 0 or 1 directly (`synth_param_get` calls use other ids), and the image holds no category or genre names. The unit has no on-device filter or browser for them.
+
 Components treats the patch as an opaque blob apart from the name, category and genre (see *Components' view*). It doesn't name the synth parameters. The PDF's offset table and the firmware tables are the source for those.
+
+### Patch bytes the PDF does not name
+
+The parameter setter `param_set` (`0x0801C842`) writes each id into a slot of a parameter group (osc 1, osc 2, a third group, sync, mixer, filter, distortion, envelope, LFO, mod matrix, routing). That placement, the MIDI numbers and the YBC "Patch Details" screenshots (*Editor screenshots*) name the four bytes the PDF leaves out:
+
+| byte | id | MIDI | name | evidence |
+|------|----|------|------|----------|
+| 27 | 2 | NRPN 0:73 | amp envelope re-trigger (bool, default 0) | envelope group slot 4, after ADSR; Components names NRPN 0:73 `envAmpTrigger`; the MIDI PDF lists `Trigger` 0–1; screenshots show "Re-Trigger" under Amp Env |
+| 49 | 9 | CC 5 | osc 1 glide (0–127) | slot 6 of the osc 1 group; CC 5 is portamento time; screenshots show a Glide knob per oscillator |
+| 58 | 16 | CC 37 | osc 2 glide (0–127) | slot 6 of the osc 2 group |
+| 60 | 18 | CC 7 | patch level (0–127) | first slot of the mixer group; CC 7 is volume; screenshots show "Patch Level"; both firmware templates and Roboo use 100 |
+
+`tools/patchbank.py` decodes them as `env_retrigger`, `osc1_glide`, `osc2_glide` and `patch_level`.
+
+**Re-trigger on hardware (2026-10-25): 1 = retrigger, 0 = legato** (a second key held over the first replays the envelope only at 1). It is the panel's Shift + PWM toggle (light on = 1), and NRPN 0:73 sets it too, both checked by reading the current patch back. The user guide doesn't mention it. To hear it, use a pluck (attack 0, decay ~70, sustain 0); with sustain at maximum both sound the same.
 
 ### Split-pair decode (resolved)
 
-Every parameter that the firmware sends as a CC plus a second CC 32 higher (`CC(8)` in Novation's MIDI parameter PDF) has an 8-bit value and takes two bytes in the patch. The firmware's patch store `FUN_080176e8` writes them as
+Every parameter that the firmware sends as a CC plus a second CC 32 higher (`CC(8)` in Novation's MIDI parameter PDF) has an 8-bit value and takes two bytes in the patch. The firmware's patch store `patch_store_param` writes them as
 
 ```
 byte[off]     = value >> 1          (0..127)
 byte[off + 1] = (value & 1) << 6    (0x00 or 0x40)
 ```
 
-and reads them back as `value = byte[off] << 1 | byte[off + 1] >> 6`. The MIDI-out encoder `FUN_08018B90` splits the value the same way across the two CCs. The PDF's "MSB" byte is therefore the value's **low bit**, not a high bit.
+and reads them back as `value = byte[off] << 1 | byte[off + 1] >> 6`. The MIDI-out encoder `midiout_param` splits the value the same way across the two CCs. The PDF's "MSB" byte is therefore the value's **low bit**, not a high bit.
 
 The parameter table at `0x0802A62A` (`docs/session-format.md`) gives each parameter's kind and centre, so the signed ones are decoded by subtracting it:
 
@@ -94,31 +108,32 @@ The YBC "Big City Flippin' Grooves" pack ships a `.syx` bank plus 64 "Patch Deta
 ## Reference data
 
 - `private/Roboo.monostationpack` (private repo, `private/README.md`) — a real 64-patch bank: slots 0–31 named (bass1–4, drum one-shots, pad1–4, key1–4, …), 32–63 = `Initial Patch`. Primary corroboration for the 136-byte layout above.
-- Firmware 800 embeds two defaults in its image: `Classic Mono` (`0x08028868`) and `Initial Patch` (`0x08028F6B`), each a bare 126-byte patch (the 136-byte message without its 9-byte header and `F7`), name first. `Classic Mono` is the patch a blank session gets: `FUN_08018ca4` copies it to session offset `0x15F5C`. `Initial Patch` is the "empty slot" reference: at boot the firmware reads 128 stored patches from external flash (block `n/8 + 2`, offset `(n % 8) × 512`, i.e. from `0x2000`) and builds a bitmask of slots that differ from it, and `FUN_0801b4e0` updates that mask when a patch is saved. The firmware image contains **only** these templates, not a factory bank: the factory patches are in the external flash's patch store, outside the update image.
+- Firmware 800 embeds two defaults in its image: `Classic Mono` (`0x08028868`) and `Initial Patch` (`0x08028F6B`), each a bare 126-byte patch (the 136-byte message without its 9-byte header and `F7`), name first. `Classic Mono` is the patch a blank session gets: `session_init` copies it to session offset `0x15F5C` (the in-session patch copy, `docs/session-format.md`). `Initial Patch` is the "empty slot" reference (*Patch store*). The firmware image contains **only** these templates, not a factory bank: the factory patches are whatever the external flash's patch store holds, outside the update image.
 
 ### Patch store: 128 slots, 64 reachable from the panel
 
 The firmware's patch store has **128 slots** of 512 bytes at external-flash `0x2000`–`0x12000`. Components and the user guide use only 64 (`0x2000`–`0xA000`). Every firmware check on a slot number is `< 0x80`, and none is `< 0x40`:
-- the boot scan `FUN_0800e1f8` reads all 128 and keeps a 128-bit "differs from `Initial Patch`" mask in four observable words (`0x10`–`0x13`);
-- the patch save `FUN_0801b4e0` updates that mask. Its two callers reject slot ≥ `0x80`: the session-controller port handler at `0x08019A26` (save the current patch, or clear a slot with `Initial Patch`), and `0x08020210` (slot 2 of the session-controller vtable `0x08027068`, which writes the patch it is given to slot `r4`; probably the SysEx slot write, not yet confirmed);
-- the patch-load handler `FUN_08019AE4` (parameter id `0x50`) loads slot `< 0x80`.
+- the boot scan in `app_construct` reads all 128 (slot `n` from block `n/8 + 2`, offset `(n % 8) × 512`) and keeps a 128-bit "differs from `Initial Patch`" mask in four observable words (`0x10`–`0x13`);
+- the patch save `patch_mask_update` (`0x0801B4E0`) updates that mask. Its two callers reject slot ≥ `0x80`: the session-controller port handler at `0x08019A26` in `session_ctl_on_cell` (save the current patch, or clear a slot with `Initial Patch`), and `session_ctl_patch_write` (`0x08020210`, the port handler at slot 2 of the session-controller vtable `0x08027068`, called through `port_send`), which writes the patch it is given to the given slot;
+- `session_ctl_patch_write` is the SysEx slot write. `sysex_patch_rx` (`0x08018C18`) passes a type-1 message through `midi_ctl_send_b` (port field `+0x34`); it arrives on session-controller port `+0x30` and is saved to the slot in byte 7. A type-0 message goes through `midi_ctl_send_a` (`+0x30`) to port `+0x2C` and is loaded as the current patch;
+- the patch-load handler `session_ctl_patch_load` (`0x08019AE4`, parameter id `0x50`) loads slot `< 0x80`.
 
-Only the panel stops at 64. The patch view (render `FUN_08013ac4`, pads `FUN_08014330`) shows 32 pads, and slot = page × 32 + pad. Oct ↓ / Oct ↑ (button events `0x14` / `0x15` in `FUN_08011FBC`) call `FUN_08022fdc(view, 0)` / `(view, 1)`, so the page is only ever 0 or 1. The render does mask the page with `& 7` and lights the Oct LEDs by `page == 0` vs `page != 0`.
+Only the panel stops at 64. The patch view (`patch_view_render`, `patch_view_pads`) shows 32 pads, and slot = page × 32 + pad. Oct ↓ / Oct ↑ (button events `0x14` / `0x15` in `ui_button_event`) call `patch_view_set_page(view, 0)` / `(view, 1)`, so the page is only ever 0 or 1. The render does mask the page with `& 7` and lights the Oct LEDs by `page == 0` vs `page != 0`.
 
 So slots 64–127 are probably left over from a 4-page design. A type-1 SysEx slot write reaches them (tested on slot 64), and a patched page setter could too (#5). Program change doesn't load them (below).
 
 **Program change doesn't reach them, although the code path suggests it would.** The MIDI PDF documents program change 0–63 on the Osc 1 channel, but the firmware doesn't clamp it:
-- The MIDI-in router at `0x080186B8` (missed by Ghidra; registered from the UI constructor `FUN_0800FB5C` via literal `DAT_0800FB04`) dispatches on `status & 0xF0`.
+- The MIDI-in router `midi_in_parse` (`0x080186B8`, missed by Ghidra; registered from `ui_construct` via literal `DAT_0800FB04`) dispatches on `status & 0xF0`.
 - For `0xC0` it calls slot 3 of the MIDI target's vtable `0x08026FE4` with a base of `0` when the channel matches context byte `+0xB` (Osc 1 channel, default 0 = ch 1), or `0x20` when it matches byte `+0xC` (default 15 = ch 16).
-- Slot 3, `0x0801C626`, sends:
-  - base 0 → `set(0x50, program, 1)`, the patch-number setter `FUN_0801C842`, with no range check, so on to `FUN_08019AE4` (`< 0x80`);
-  - base `0x20` → `FUN_08014D2E(obj + 0x2C, program)`, session select (PDF: 0–31 instant, 64–95 queued).
+- Slot 3, `midi_ctl_program_change` (`0x0801C626`), sends:
+  - base 0 → `set(0x50, program, 1)`, the setter `param_set`, with no range check, so on to `session_ctl_patch_load` (`< 0x80`);
+  - base `0x20` → `port_post(obj + 0x2C, program)`, session select (PDF: 0–31 instant, 64–95 queued).
 
-On hardware (#5, `docs/hw-test-patch-slots.md`), with `Min 3rd` written to flash slot 64, PC 64, 96, 104 and 127 all loaded the built-in `Initial Patch`, also after a power cycle. The path that substitutes the template isn't traced: the load handler `FUN_08019AE4` has a port (`+0x34`) that copies `Initial Patch` with no slot argument, and the setter posts through a port chain (`FUN_08014D2E`) not yet resolved.
+On hardware (#5, `docs/hw-test-patch-slots.md`), with `Min 3rd` written to flash slot 64, PC 64, 96, 104 and 127 all loaded the built-in `Initial Patch`, also after a power cycle (*Open items*).
 
 ## Coarse tune
 
-The engine doesn't quantise coarse tune to semitones. `synth_update_osc1` / `synth_update_osc2` pass the 8-bit coarse value (param id 6 for Osc 1) through `FUN_0801D028`:
+The engine doesn't quantise coarse tune to semitones. `synth_update_osc1` / `synth_update_osc2` pass the 8-bit coarse value (param id 6 for Osc 1) through `cents_to_pitch` (`0x0801D028`):
 
 - The byte table at `0x08029B01` (256 signed entries) maps the value to tenths of a semitone, −120…+120, so the range is ±1 octave. Each whole semitone appears twice (a 2-step plateau, e.g. values 127 and 128 are both 0), and the steps in between are tenths.
 - The table at `0x08029D1C` gives the number of sub-steps per semitone: 10, or 9 for semitones 3, 6 and 10 (their tenth 9 is missing from the first table, so the 255 positions fit ±12 semitones).
@@ -127,6 +142,4 @@ The engine doesn't quantise coarse tune to semitones. `synth_update_osc1` / `syn
 So coarse moves in ~0.1-semitone steps that stay on each semitone for one extra step. Not checked by ear on the unit.
 
 ## Open items
-- Request message (`0x40`): confirmed on hardware, current patch only (`40 00`).
-- Why program change ≥ 64 loads the `Initial Patch` template instead of the flash slot.
-- The in-session patch copy is in `docs/session-format.md`.
+- Why program change ≥ 64 loads the `Initial Patch` template instead of the flash slot (#5). The path that substitutes the template isn't traced: `session_ctl_patch_load` has a port (`+0x34`) that copies `Initial Patch` with no slot argument, and `param_set` posts through a port chain (`port_post`) not yet resolved.

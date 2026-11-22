@@ -13,7 +13,7 @@ Save from the page with the values back after a power cycle.
 - **One store for all mods**, not one per feature. A setting that isn't in the store means
   stock behaviour (a flag means off). Every mod is inert at its defaults.
 - **The app writes it, through the bootloader**, with the upload the pack sender uses
-  (`docs/session-transport.md` *Upload*). The firmware only reads it, once at boot. It never
+  (`docs/session-transport.md` *Requesting and sending*). The firmware only reads it, once at boot. It never
   writes external flash for this. Writing from the firmware comes later, if a setting has to
   change from the panel.
 - **Live changes through SysEx, in RAM.** Sound tweaks such as the drive sliders are heard
@@ -83,7 +83,8 @@ is the mod, the low byte the setting.
 
 ## Store in external flash
 
-One 4 KB subsector at **`0x7FF000`**, the last one of the 8 MiB chip. Everything from
+One 4 KB subsector at **`0x7FF000`**, the last one below the app's `0x800000` read limit
+(likely an 8 MiB chip, `docs/session-transport.md`). Everything from
 `0x2E8000` up is unused (all `FF`, `docs/session-transport.md` *Storage map*); the far end
 keeps clear of the sessions.
 
@@ -128,7 +129,7 @@ text a string. Ops 0 and 3 work before the store is read; a set before then answ
 
 | id | mod | setting | issue |
 |----|-----|---------|-------|
-| `0x01xx` | drive | `0x0101` Overdrive amount, `0x0102`/`0x0103`/`0x0104` Distortion 1/2/3 amount (one per panel type; `0x0102` was one Distortion amount for all types in earlier 751 test builds): sliders 0–100, 0 = stock (default), 50 = the fixed boost of builds up to 751, 100 = twice that push. By ear on the unit (2026-11-21) every distortion type is at its most at about 50; the range up to 100 stays, so nobody is short of drive | #61 |
+| `0x01xx` | drive | `0x0101` Overdrive amount, `0x0102`/`0x0103`/`0x0104` Distortion 1/2/3 amount (one per panel type; `0x0102` was one Distortion amount for all types in earlier 751 test builds): sliders 0–100, 0 = stock (default), 50 = the fixed boost of the fixed-drive builds (release 750; numbering restarted at test 751), 100 = twice that push. By ear on the unit (2026-11-21) every distortion type is at its most at about 50; the range up to 100 stays, so nobody is short of drive | #61 |
 
 ## In the app
 
@@ -141,7 +142,7 @@ host-compiled `settings.c`).
   Otherwise it reads every description (`7C 00`) and value (`7C 01`), groups the controls
   by mod (one control per kind) and sends `7C 02` as a control changes; while a slider
   drags, only the latest value waits for the previous reply.
-- **Save** reboots into the bootloader, dumps the store, writes the new one, reads it back
+- **Save to unit** reboots into the bootloader, dumps the store, writes the new one, reads it back
   and leaves the bootloader (a few seconds), then reads the settings again. The new store
   keeps the entries of ids this build doesn't know (another build's settings) and leaves
   out settings at their default, so those follow the default of whatever build runs.

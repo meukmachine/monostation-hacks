@@ -10,7 +10,7 @@ Sources, all in `app.asar` → `ember-dist/assets/`:
 - the `chunkFirmware` handler in `decode-worker-*.js`;
 - the timeouts in `ember-dist/index.html` (`MAX_WAIT_FOR_RESET_TIMEOUT` 8000, `FIRMWARE_UPDATE_TIMEOUT` 10000).
 
-All of this is the host side, read statically. The bootloader's side has not been observed. It is inferred from what the host waits for.
+All of this is the host side, read statically. The bootloader's side, from its dump, is in `docs/bootloader.md`.
 
 The application's side (how firmware 800 handles `0x70` and `0x71`) is in `docs/sysex-handlers.md`.
 
@@ -20,7 +20,7 @@ Components tells the application from the bootloader by the MIDI port name:
 - **bootloader:** the name contains `Circuit Mono Station Bootloader` or `Circuit Mono Station BL`;
 - **application ("present"):** the name contains `Circuit Mono Station` and neither bootloader string.
 
-**Version inquiry.** Components sends `F0 00 20 29 00 70 F7` to whichever port is active. The reply has `0x70` at byte 5. Bytes 6–10 are the bootloader version and bytes 11–15 the firmware version, each as 5 decimal digits, most significant first. An update is offered when the firmware version is below `MONOSTATION_LATEST_FIRMWARE_VERSION` (800).
+**Version inquiry.** Components sends `F0 00 20 29 00 70 F7` to whichever port is active. Components reads the reply's bytes 6–10 as the bootloader version and bytes 11–15 as the firmware version, each 5 decimal digits, most significant first (reply format: `docs/sysex-handlers.md`). An update is offered when the firmware version is below `MONOSTATION_LATEST_FIRMWARE_VERSION` (800).
 
 Mono Station update config (`o1` defaults overridden by the device class):
 
@@ -55,7 +55,7 @@ Mono Station update config (`o1` defaults overridden by the device class):
    - **10-byte form** `F0 00 20 29 00 72 a b c F7`: counter = `a + (b << 7) + (c << 14)`.
    - **15-byte form:** counter = `b[13] + (b[12] << 4) + (b[11] << 8)`, three nibbles at the end of the 8 bytes at 6–13. This looks like a nibble encoding used by other products. Only the short form accepts a counter of 0 after a higher one.
 
-   Components sends the next packet only when the counter is greater than the last one it accepted, or is 0. It starts from −1, so the first ack may be 0. Duplicate or stale acks are ignored, and a missing ack ends the update with a timeout. So the bootloader paces the transfer, presumably acknowledging each packet once it has been written or buffered.
+   Components sends the next packet only when the counter is greater than the last one it accepted, or is 0. It starts from −1, so the first ack may be 0. Duplicate or stale acks are ignored, and a missing ack ends the update with a timeout. So the bootloader paces the transfer: it acks each `0x72` block after programming it (`docs/bootloader.md` *SysEx*).
 
    **Status reports:** a 10-byte SysEx with byte 5 = `0x73` and the code at byte 6. With `listenForDeviceStatusReport` off, Mono Station never needs to send one, but the handler is active:
 
@@ -78,15 +78,18 @@ Mono Station update config (`o1` defaults overridden by the device class):
 
 ## Consequences for our own flasher
 
-- **The `0x76` trailer is never sent.** The loop stops at the `0x73` packet, and in the stock 800 file that packet is the second to last, followed by `0x76`. So the bootloader must finish the update on `0x73`, the vector-table block at offset 0. It then reboots, since Components next waits for the new version to be reported. The bootloader doesn't verify a checksum either. It keeps a word sum that nothing reads, and `0x73` boots the new image at once (`docs/bootloader.md`). `tools/bin2syx.py` should keep writing a correct trailer anyway.
+- **The `0x76` trailer is never sent.** The loop stops at the `0x73` packet, the second to last in the stock 800 file. The bootloader boots the new image on `0x73` and never verifies a checksum (`docs/bootloader.md`); `tools/bin2syx.py` writes a correct trailer anyway.
 - **The `0x73` block must come last.** A flasher must not send anything after it, or must at least expect the device to have left the bootloader.
-- **Reboot.** The app accepts any `0x71` with `00 7F` at bytes 6–7 (or a bare `0x60`), writes `2` to backup SRAM and jumps to the bootloader without a system reset (`docs/sysex-handlers.md`). A patched image must keep that path to stay updatable without the manual entry (*Entering the bootloader by hand*).
-- **Version digits.** The bootloader sees the `0x71` start message with the version digits. The bootloader doesn't look at them: `0x71` only needs `00 7F` at bytes 6–7 (`docs/bootloader.md`). Components itself only offers an update when the running version is below 800. That version comes from the image header (`MAIN` + BCD at image offset `0x1B0`), not from the container digits. A modified image that reports a version of 800 or higher won't be "updated" by Components, which matters for restoring stock (*Recovery*).
+- **Reboot.** The app accepts any `0x71` with `00 7F` at bytes 6–7 (or a bare `0x60`) and hands over to the bootloader (`docs/sysex-handlers.md`). A patched image must keep that path to stay updatable without the manual entry (*Entering the bootloader by hand*).
+- **Version digits.** The bootloader ignores the version digits in the `0x71` start message; it only needs `00 7F` at bytes 6–7 (`docs/bootloader.md`). Components only offers an update when the running version is below 800. That version comes from the image header (`MAIN` at image offset `0x1AC`, BCD version at `0x1B0`, `docs/sysex-handlers.md`), not from the container digits. A modified image that reports 800 or higher won't be "updated" by Components (*Recovery*).
 - **Pacing.** Wait for each ack: the 10-byte `0x72` reply with an increasing counter. Do not stream. Use a timeout of at least 10 s per packet.
-## Our flasher (`tools/flash.py`)
+
+## Our flashers
+
+### Python reference (`tools/flash.py`)
 
 `python3 tools/flash.py <firmware.syx> [--port NAME] [--yes]` implements the sequence above. It needs mido + python-rtmidi.
-1. It decodes and checks the file first: message order (`0x71`, `0x72`…, one `0x73`, `0x76`), 44-byte data messages, product id `00 7F`, the trailer checksum, the `MAIN` header version, an image end at or below `0x08080000` (the bootloader's erase limit), and a vector table with the stack in RAM and a Thumb reset vector inside the image.
+1. It decodes and checks the file first: message order (`0x71`, `0x72`…, one `0x73`, `0x76`), 44-byte data messages, product id `00 7F`, the trailer checksum, the `MAIN` header version, an image end at or below `0x08080000` (the bootloader's erase limit, `docs/bootloader.md`), and a vector table with the stack in RAM and a Thumb reset vector inside the image.
 2. It asks you to enter the bootloader by hand and waits up to 10 minutes for its port. It never sends the `0x71` reboot.
 3. It sends `0x70`, then asks for confirmation unless `--yes` is given.
 4. It sends every packet up to and including `0x73`, each one after the previous ack. The timeout is 10 s per ack, and status codes 16/124/126 abort.
@@ -97,6 +100,10 @@ The packet order (0x71 once to the bootloader, then one packet per ack) follows 
 - it acked every packet, and 4,058 packets took 7 s;
 - after `0x73` the app started by itself and reported 800, so no `0x76` trailer is needed and reflashing the same version is accepted.
 
+### Kotlin flasher (`flasher/`)
+
+The user-facing flasher (JVM CLI and web page) ports the same flow to common code: `Firmware.kt` `checkSyx` runs the same file checks, and `Session.kt` `flashFirmware` sends the packets with the same per-ack pacing and status handling, then checks the app's `0x70` version against the header. Unlike `tools/flash.py` it enters the bootloader itself (`reachBootloader`): if the app port answers, it sends the short reboot `F0 00 20 29 00 71 00 7F 00 00 F7` and waits up to 8 s for the bootloader port. When no app answers, the port doesn't appear, or `--manual` is given, it falls back to waiting for the button entry. CLI: `./gradlew jvmRun --args="FILE.syx [--check|--list|--manual|--yes]"`.
+
 ## Entering the bootloader by hand
 
 From the user guide (v1.2, appendix *Bootloader Mode*, p. 90):
@@ -106,13 +113,11 @@ From the user guide (v1.2, appendix *Bootloader Mode*, p. 90):
 
 The guide's picture shows the buttons Osc 1, Osc 2, Mod Seq, Oct ↓, Oct ↑, Clear, Save and Sessions, with Osc 1 and Osc 2 lit. Pressing Osc 1 or Osc 2 shows a firmware element's version number as a binary pad pattern. **Reading the lights:** each pad row is one byte, high byte first, and the version is BCD. Osc 2 shows the app's header version: stock 800 lights `00001000 00000000`, a build 801 lights `00001000 00000001`. Osc 1 shows the bootloader's 740 as `00000111 01000000`. Rows 3–4 are `00000000`. **Play** exits and reboots into the application. The guide calls this an "engineering mode" for updating firmware, **and factory patches**, when a normal update fails. Novation's support article on bootloader mode gives the same combination.
 
-The bootloader checks the buttons itself before it starts the app (`docs/bootloader.md` *Boot*), so **the combination works even when the application image is broken.**
+The bootloader checks the buttons itself before it starts the app (`docs/bootloader.md` *Boot decision*), so **the combination works even when the application image is broken.**
 
-The application has other power-on combinations, which are not bootloader entries:
-- **Shift:** System Settings;
-- **Shift + Save:** toggle save lock;
-- **Shift + Clear:** load the Init Patch instead of the last session.
+The application's own power-on combinations (Shift, Shift + Save, Shift + Clear) are not bootloader entries; they are listed in `docs/inventory.md` (*Boot key combos*).
 
 ## Recovery
 
 - **Recovery path.** Components starts directly at step 3 when the bootloader port is already present, for example when the unit was booted into the bootloader by hand. A failed transfer can be retried that way, provided the bootloader region itself is untouched.
+- **Restoring stock.** Our flashers send any version, the bootloader doesn't compare versions, and stock 800 over 800 was accepted (*Our flashers*). Only Components refuses to "update" an image that reports 800 or higher; to restore stock through Components, the modified image must report a lower version (`docs/sysex-handlers.md` *Image header and version*).

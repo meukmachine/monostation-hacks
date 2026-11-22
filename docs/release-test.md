@@ -22,6 +22,9 @@ python3 tools/fwsrc.py build build/rel build/rel/fw.bin
 python3 tools/bin2syx.py build/rel/fw.bin private/firmware/mods-N.syx --version N
 ```
 
+`drive` needs `settings` (`fwsrc.py` refuses it without), and `sequences`' Shift + Patterns
+(Append) needs `randomise`. The diff for the page: `docs/firmware-diff.md` *Making one*.
+
 ## Flash
 
 - [x] The flasher page flashes it (Firefox): reboot into the bootloader, send, the unit reports N (751 from the live page, 7 s, 2026-11-21).

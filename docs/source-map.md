@@ -18,12 +18,7 @@ Classes, interfaces and how they link: `docs/class-diagram.md`.
 
 ### Cells
 
-State lives in **cells**: double-buffered values with subscriber lists
-(`docs/sequencer.md` *Observable state*). A writer calls `cell_write` (or
-`cell_write_field0`/`_field1`, `cell_write_indexed`) to get the back buffer, fills it and
-calls `cell_commit`, which swaps buffers and calls every subscriber's `on_cell` slot.
-Readers call `cell_read` / `cell_read_field1`. A **port** (`port_post`) is a cell used as
-a message: a view posts its id to ask the mode view to switch.
+State lives in **cells**, double-buffered values with subscriber lists (`cell_read`, `cell_write`, `cell_commit`; `docs/sequencer.md` *Observable state cells*). A **port** (`port_post`) is a cell used as a message: a view posts its id to ask the mode view to switch.
 
 ### Views
 
@@ -80,14 +75,7 @@ the patch randomiser (#45, `overlays/randomise`) uses it, reading the current ra
 
 ### Note path
 
-MIDI in (`midi_in_parse` → `midi_ctl_*`) and the track players (`player_on_cell`) feed
-note adapters (`note_adapter`, `player_source_adapter`, `midi_note_adapter`: ±12 and
-track tags), the merge stage (two 128-bit held-note sets), the router
-(`router_note_on/off`, `router_map_note`) and the sinks (`synth_obj_note_on`,
-`midiout_note_on`). The record hub (`rec_hub_*`) taps notes and params for the recorder.
-MIDI out goes through `midiout_send` → `midi_tx_queue_msg` → `midi_tx_pump`
-(`docs/sequencer.md` *MIDI*).
-
+How notes get from the panel, MIDI in and the players to the synth, MIDI out and the recorder: `docs/sequencer.md` *Note routing*; classes in `docs/class-diagram.md`.
 
 ## App files
 
@@ -448,8 +436,8 @@ MIDI out goes through `midiout_send` → `midi_tx_queue_msg` → `midi_tx_pump`
 | `08016946` | `midi_note_adapter_note_on` | 32 | MIDI note adapter: note on, maps channel to track |
 | `08016966` | `bool_invert_adapter` | 28 | returns !inner(0, ...) |
 | `08016982` | `forward_adapter` | 22 | calls inner slot 0 |
-| `08016998` | `merge_stage_note_off` | 92 | two 128-bit held-note sets; forwards when neither holds the note |
-| `080169F4` | `merge_stage_note_on` | 96 | merge stage: note on, records it in a 128-bit held set |
+| `08016998` | `merge_stage_note_off` | 92 | two 160-bit held-note sets; forwards when neither holds the note |
+| `080169F4` | `merge_stage_note_on` | 96 | merge stage: note on, records it in a 160-bit held set |
 | `08016A54` | `cell_write_field2` | 6 | cell_write(cell, 2) |
 | `08016A5A` | `pattern_length` | 24 | pattern length from the start/end nibbles (wraps at 16) |
 | `08016A72` | `recorder_note_off` | 28 | recorder: note off |
@@ -516,8 +504,8 @@ MIDI out goes through `midiout_send` → `midi_tx_queue_msg` → `midi_tx_pump`
 | `08018590` | `midi_ctl_continue_thunk` | 8 | this-adjusting entry of `midi_ctl_continue` |
 | `08018598` | `midi_ctl_start` | 8 | MIDI control: start |
 | `080185A0` | `midi_ctl_start_thunk` | 8 | this-adjusting entry of `midi_ctl_start` |
-| `080185A8` | `midi_ctl_cc` | 56 | MIDI control: CC in, param or setting |
-| `080185E0` | `midi_ctl_cc_thunk` | 8 | clamps to the param range |
+| `080185A8` | `midi_ctl_cc` | 56 | MIDI control: CC/NRPN param in, clamped to the param range (`param_table` centre + min … max), to the param object `+0x20` with source 1 |
+| `080185E0` | `midi_ctl_cc_thunk` | 8 | this-adjusting entry of `midi_ctl_cc` |
 | `080185E8` | `midi_ctl_note_off` | 48 | MIDI control: note off in |
 | `08018618` | `midi_ctl_note_on` | 62 | MIDI control: note on in |
 | `08018656` | `midi_in_cc_pair` | 98 | CC n / n+32 MSB+LSB pairing via the CC map |
@@ -779,7 +767,7 @@ MIDI out goes through `midiout_send` → `midi_tx_queue_msg` → `midi_tx_pump`
 | `0801A830` | `usb_soft_disconnect` | 24 | USB soft disconnect (DCTL.SDIS) |
 | `0801A848` | `SystemInit` | 236 | CMSIS system_stm32f4xx.c with SetSysClock: HSE, PLL, FLASH ACR 0x705 |
 | `0801A934` | `dma_stream_setup` | 300 | DMA_DeInit + DMA_Init from a config struct |
-| `0801AA60` | `spi_init` | 128 | SPI1/SPI4 RCC enable, CR1 setup, SPE |
+| `0801AA60` | `spi_init` | 128 | SPI clock enable (APB2 for SPI1/SPI4, else APB1), CR1 setup, SPE |
 | `0801AAE0` | `spi_pins_init` | 112 | GPIO_Init + GPIO_PinAFConfig for SCK/MISO/MOSI |
 
 ### drivers_a
@@ -1232,7 +1220,7 @@ MIDI out goes through `midiout_send` → `midi_tx_queue_msg` → `midi_tx_pump`
 |---|---|---:|---|
 | `0801FAC4` | `pattern_ctl_on_cell` | 1860 | pattern copy/clear (memcpy/memset of 0x6c-byte records), step-edit writes and clears of step byte 4 and automation lanes from pots and the patches view; vt_pattern_ctl slot 1 |
 | `08020208` | `pattern_ctl_on_cell_thunk` | 8 | this-4 adjust |
-| `08020210` | `session_ctl_patch_write` | 94 | session control: write a patch into the session |
+| `08020210` | `session_ctl_patch_write` | 94 | session control vtable+8 port handler (via `port_send`): SysEx type 0 (current patch) arrives on port `+0x2C` from `midi_ctl_send_a`, type 1 (slot write, slot < 0x80) on port `+0x30` from `midi_ctl_send_b`, saved through `patch_mask_update` |
 | `0802026E` | `session_ctl_patch_write_thunk` | 10 | this-4 adjust, vtable 0x08027084 |
 
 ### sysex
@@ -1473,7 +1461,7 @@ MIDI out goes through `midiout_send` → `midi_tx_queue_msg` → `midi_tx_pump`
 | `08024810` | `nor_program_mode` | 164 | mode -> command 0x02/0xA2/0x32 |
 | `080248B4` | `nor_read` | 108 | mode -> command 0x03/0x0B/0x3B/0x6B |
 | `08024920` | `pin_write` | 32 | {GPIO, mask, active level} via BSRR |
-| `08024940` | `bootloader_handover` | 140 | bootloader handover (flag 2, reset) |
+| `08024940` | `irq_quiesce` | 140 | quiesce routine: stops the timers, masks and clears every NVIC IRQ; no flag, no reset. Used by the power-off path (`power_calib_task`) and the reboot handover |
 | `080249CC` | `pin_group_write` | 48 | writes table pattern n to a pin group via BSRR |
 | `080249FC` | `midi_rx_byte` | 224 | serial MIDI byte: fixed-length/SysEx collection, running status |
 
@@ -1567,7 +1555,7 @@ MIDI out goes through `midiout_send` → `midi_tx_queue_msg` → `midi_tx_pump`
 
 ## Runtime and libraries
 
-C runtime, startup, IRQ handlers and the newlib-nano / libstdc++ objects (`docs/source-build.md`, `docs/firmware-map.md` *Runtime libraries*).
+C runtime, startup, IRQ handlers and the newlib-nano / libstdc++ objects (`docs/source-build.md` *Library code*).
 
 ### crtbegin
 
@@ -1820,7 +1808,9 @@ the next label in the generated source, so it can be shorter than the object.
 
 | Address | Name | Size | Purpose |
 |---|---|---:|---|
-| `0800C000` | `g_pfnVectors` | 428 | vector table (`firmware-map.md`) |
+| `0800C000` | `g_pfnVectors` | 428 | vector table (handlers under *stm32f4xx_it*, *startup*) |
+| `0800C1AC` | `image_header` | 6 | image header: tag `MAIN` + BCD version `00 08` = 800 (`sysex-handlers.md`) |
+| `08026D98` | `session_defaults` | 28 | session template: globals `78 32 03 00 …` and pattern counts `10 08 08` (`session_init`, `session-format.md`) |
 | `08026DB4` | `adc_desc_power` | 60 | `adc_filter_push`/`pots_scan` descriptor with one channel, read by `main` and `power_calib_task` |
 | `08026DF0` | `adc_desc_pads` | 60 | `adc_filter_push` descriptor of the 32 pressure pads (`main`) |
 | `08026E3C` | `calib_test_patch` | 78 | test patch `calib_load_patch` copies over the live patch |
@@ -1832,17 +1822,34 @@ the next label in the generated source, so it can be shorter than the object.
 | `08026F74` | `button_index_map` | – | 34 bytes, identity 0–33: button id -> index into `button_matrix_bits` (`button_feature_enabled`, `app_main`) |
 | `08026FA0` | `vt_cell_mirror` | 12 | vtable: `cell_mirror_on_cell` |
 | `08026FAC` | `vt_synth_routing` | 12 | vtable: `synth_routing_on_cell` |
+| `08026FB8` | `vt_synth_obj` | 32 | synth object (0x90 bytes, holds the live patch): `[0] synth_obj_note_on`, `IParamSink` at `+4` (`class-diagram.md`) |
 | `08026FD8` | `vt_forward_adapter` | 12 | vtable: `forward_adapter` |
+| `08026FE4` | `vt_midi_ctl` | 132 | MIDI controller (0x84 bytes): note on/off, program change, CC; interfaces at `+4`, `+8` (transport events), `+0xC` (clock), `+0x10` (`sequencer.md` *MIDI in*) |
+| `08027068` | `vt_session_ctl` | 40 | session controller: `session_ctl_save_globals`, `session_ctl_on_cell`, `session_ctl_patch_write`; `IAux` at `+4` (`session_ctl_patch_load`) |
 | `08027090` | `vt_bool_invert_adapter` | 12 | vtable: `bool_invert_adapter` |
+| `0802709C` | `vt_midiout` | 40 | MIDI out (0x1C bytes): slots 0–7 note on/off, Start, Continue, Stop, SPP, Song Select, clock (`sequencer.md` *MIDI clock and transport*) |
+| `080270C4` | `vt_midiout_transport` | 28 | MIDI out `this + 4` interface (slots 2–6): the transport's `+0x10` |
+| `080270E0` | `vt_midiout_clock` | 12 | MIDI out `this + 8` clock interface (`midiout_clock_tick`): the clock state's `+0x08` |
+| `080270EC` | `vt_player_source_adapter` | 16 | router input adapter of the players: id 0–2 → router channel base + id (`sequencer.md` *Note routing*) |
+| `080270FC` | `vt_track_recorder` | 60 | per-track recorder, shared by all three recorders: `recorder_note_on` … `recorder_write_patch_change` (`sequencer.md` *Recording*) |
 | `08027138` | `vt_clock_state` | 28 | vtable: `clock_state_on_midi_clock`, `clock_state_on_cell` (+ thunk for the second base) |
+| `08027154` | `vt_rec_hub` | 32 | record hub (0x18 bytes): `rec_hub_note_on`, `rec_hub_note_off`, `rec_hub_param`; `IParamSink` at `+4` |
 | `08027174` | `vt_param_set_adapter` | 12 | vtable: `param_set` |
+| `08027180` | `vt_note_adapter` | 16 | note − 12 adapter in front of the synth object and MIDI out |
+| `08027190` | `vt_transport_source_adapter` | 28 | forwards transport events with a source id (0 MIDI in, 1 panel) |
+| `080271AC` | `vt_midi_note_adapter` | 16 | MIDI-in note adapter into router channels 6–7 |
+| `080271BC` | `vt_pattern_ctl` | 36 | pattern controller: `pattern_ctl_flush`, `pattern_ctl_on_cell` (`sequencer.md` *Step editing*) |
 | `080271E0` | `vt_patch_store` | 28 | vtable: `patch_store_param`, `param_get_raw`, `param_get`, `patch_copy_in`, `patch_copy_out` |
 | `080271FC` | `vt_modseq_output` | 12 | vtable: `modseq_output` |
+| `08027208` | `vt_transport` | 36 | transport: `transport_on_tick_cell`, `transport_button`, Start … Song Select (`sequencer.md` *Transport*) |
+| `0802722C` | `vt_transport_base1` | 20 | transport second base (`this − 4`, `IAux`): thunks |
+| `08027240` | `vt_transport_events` | 28 | transport `this + 8` `ITransportEvents`: Start, Continue, Stop, SPP, Song Select |
 | `0802725C` | `vt_midiout_param` | 12 | vtable: `midiout_param` |
-| `08027280` | `boot_combo_settings` | – | 3 bytes `{0, 0, 1}`, same index: set for Shift alone (System Settings view) (?) |
+| `08027268` | `vt_router` | 24 | note router (0xA0C bytes): `router_note_on`, `router_note_off`; `router_on_cell` at `+4` |
+| `08027280` | `boot_combo_settings` | – | 3 bytes `{0, 0, 1}`, same index: set for Shift alone (System Settings view) |
 | `0802728C` | `vt_cell_deferred_notify` | 4 | vtable: `cell_deferred_notify` |
 | `08027290` | `boot_combo_blank_session` | – | 3 bytes `{1, 0, 0}` indexed by the boot combo (0 = Shift + Clear, 1 = Shift + Save, 2 = Shift alone; `app_construct` reads buttons `0x19`, `0x16`, `0x17` via `button_feature_enabled`): set for Shift + Clear, and `app_construct` then skips the session load |
-| `08027293` | `boot_combo_save_lock` | – | 3 bytes `{0, 1, 0}`, same index: set for Shift + Save (toggle the Save lock) (?) |
+| `08027293` | `boot_combo_save_lock` | – | 3 bytes `{0, 1, 0}`, same index: set for Shift + Save (toggle the Save lock) |
 | `080272A0` | `vt_modmatrix_view` | 64 | view vtable, slots `modmatrix_view_*` |
 | `080272E0` | `vt_patch_view` | 68 | view vtable, slots `patch_view_*` |
 | `08027324` | `vt_mode_buttons_view` | 56 | view vtable, slots `mode_buttons_*` (button view `0x17`, see *Views*) |
@@ -1855,6 +1862,7 @@ the next label in the generated source, so it can be shorter than the object.
 | `080274FC` | `pots_desc_osc` | 60 | `pots_scan` descriptor of Osc Coarse and Fine/PW (ids `0x22`, `0x23`) |
 | `08027538` | `pots_main_ids` | – | 16 control ids of `pots_desc_main` (`0x20`, `0x21`, `0x24`–`0x31`) |
 | `08027550` | `vt_modseq_level_view` | 56 | view vtable, slots `modseq_level_view_*` |
+| `08027588` | `lane_ids_track0` | 84 | 42 `u16` param ids, the automation lanes of track 0 (`player_new`, `session-format.md`) |
 | `080275E8` | `vt_pad_state` | 4 | vtable of the shared per-track pad-colour state (`pad_state_on_cell`) |
 | `080275EC` | `pots_osc_ids` | – | 2 control ids of `pots_desc_osc` (`0x22`, `0x23`) |
 | `080275F8` | `vt_hold_button_view` | 64 | view vtable, slots `hold_button_view_*` |
@@ -1863,6 +1871,7 @@ the next label in the generated source, so it can be shorter than the object.
 | `080276B0` | `vt_flag_led_view` | 64 | view vtable, slots `flag_led_*` |
 | `080276F0` | `vt_filter_view` | 64 | view vtable, slots `filter_view_*` |
 | `08027730` | `vt_root_input_view` | – | vtable `ui_construct` installs on the 12-byte container view at `ui_root +8` after setting all 34 of its input-port bytes to 1: default slots, slot 10 `return_1`, no `on_cell` |
+| `0802775C` | `lane_ids_track1` | 24 | 12 `u16` param ids, the automation lanes of track 1 |
 | `0802777C` | `vt_lfo_view` | 64 | view vtable, slots `lfo_view_*` |
 | `080277BC` | `vt_view_14` | 68 | view vtable, slots `view_14_*` |
 | `08027800` | `vt_view_08027800` | – | 8-byte header, then the vtable of the 4-LED view `view_08027800_render` (slot 10, `ICellObserver` thunk at `+0xC`) |
@@ -1871,6 +1880,7 @@ the next label in the generated source, so it can be shorter than the object.
 | `080278B8` | `vt_scale_root_view` | 64 | view vtable, slots `scale_root_view_*` |
 | `080278F8` | `vt_keytrack_view` | 68 | view vtable, slots `keytrack_view_*` |
 | `0802793C` | `vt_patterns_view` | 68 | view vtable, slots `patterns_view_*` |
+| `08027980` | `vt_note_sink` | 8 | id-tagging note sink (16 bytes): `note_sink_note_on`, `note_sink_note_off` |
 | `08027988` | `pot_curve_osc` | 24 | value curve of `pots_desc_osc` |
 | `080279A0` | `vt_scale_type_view` | 64 | view vtable, slots `scale_type_view_*` |
 | `080279E0` | `vt_mixer_view` | 64 | view vtable, slots `mixer_view_*` |
@@ -1883,6 +1893,7 @@ the next label in the generated source, so it can be shorter than the object.
 | `08027B90` | `view_08027800_led_slot` | – | mode (cell `+0x10`) -> which of the view's 4 LEDs shows it (`view_08027800_render`) |
 | `08027BA4` | `vt_container_view` | 44 | vtable of `container_view_ctor`'s view (pure render) |
 | `08027BD0` | `view_08027800_mode_colour` | – | mode 1–5 -> `ui_colours` role for that LED (mode 5 lit `0x60` when another flag is set) |
+| `08027BD9` | `pad_levels` | 16 | 16 levels 0–127, one per pad: glide values and velocity LEDs (`velocity_to_level`, `pad_send_level`, `glide_view_pad_down`) |
 | `08027BEC` | `vt_gate_view` | 64 | vtable of `gate_view_ctor`'s view |
 | `08027C2C` | `sessions_colour_map` | – | 64 bytes: a per-session byte (0–63) -> colour index 0–13 stored at view `+0x35`, `0xFF` -> 11 (`sessions_view_on_cell`) (?) |
 | `08027C6C` | `note_pad_map_12` | 12 | the same map for semitones 0–11, `scale_type_view_render` |
@@ -1902,10 +1913,13 @@ the next label in the generated source, so it can be shorter than the object.
 | `080281E4` | `str_log_pad` | 45 | `"Pad %d changed state to %d with velocity %d\n"`, `input_log_pad` |
 | `08028211` | `param_update_group` | 73 | 73 bytes (?): param id − 2 -> group 0–13 that `patch_store_param` passes on with the param's dirty bit |
 | `0802825A` | `led_decay` | 390 | 390-step falling curve 142→0, read with `led_breathe` at the same index by `led_frame_compose` |
+| `080283E0` | `swing_table` | 808 | 101 `u64` `s/50 × 2^32`: tick threshold for swing 0–100 (`clock_engine`, `sequencer.md` *Swing*) |
 | `08028708` | `led_pulse_bright` | 96 | 96-step triangle 102→255→102, read with `led_pulse_full` at the same phase |
 | `08028768` | `cc_param_map_none` | 256 | 128 × `0x8000`: an all-unmapped CC map; `midi_in_parse` and `midiout_param` use it instead of `cc_param_map` when a flag in the controller state is set |
+| `08028868` | `patch_classic_mono` | 126 | `Classic Mono` patch body, the session template's patch (`sysex-spec.md`) |
 | `08028A68` | `nrpn_param_map` | 768 | 3 × 128 `u16`: NRPN (MSB 0–2, LSB) -> firmware param id, `0x8000` = not mapped |
 | `08028D68` | `midi_ctl_reset_state` | 8 | 8 bytes `7F 7F 7F 7F 00 FF 00 00` copied into a controller's per-channel state on CC 121 (Reset All Controllers) and at construction |
+| `08028D70` | `str_initial_session` | 32 | `"Initial Session"` padded with spaces, the session template's name |
 | `08028D90` | `cc_param_map` | 256 | 128 `u16`: incoming CC number -> firmware param id (`0x8000` = not mapped), e.g. CC 7 -> 18 (`patch_level`), CC 5 -> 9; `midi_in_parse` and `midi_in_cc_pair` |
 | `08028E90` | `sysex_patch_hdr` | 6 | `F0 00 20 29 01 61`, header compared by `sysex_patch_rx` and `session_ctl_on_cell` |
 | `08028E96` | `usb_device_desc` | 18 | USB device descriptor (`USBD_USR_DeviceDescriptor`) |
@@ -1915,8 +1929,10 @@ the next label in the generated source, so it can be shorter than the object.
 | `08028ED3` | `usb_str_product` | 21 | `"Circuit Mono Station"` (`USBD_USR_ProductStrDescriptor`) |
 | `08028EE8` | `usb_config_desc` | 18 | start of the 0x74-byte USB configuration descriptor (`usbd_midi_GetCfgDesc`) |
 | `08028EFA` | `usb_cfg_ac_header` | 98 | class-specific AudioControl header inside `usb_config_desc`, returned by `usbd_midi_Setup` |
+| `08028F5C` | `str_image_tags` | 5 | `"TEST"`, the first of the three image tags `app_header_valid` accepts (then `str_main`, `str_boot`) |
 | `08028F61` | `str_main` | 5 | `"MAIN"`, image tag checked by `app_header_valid` |
 | `08028F66` | `str_boot` | 5 | `"BOOT"`, image tag checked by `app_header_valid` |
+| `08028F6B` | `patch_initial` | 126 | `Initial Patch` (byte-identical to Components' init patch), written by Clear + patch pad (`sysex-spec.md`) |
 | `080290B0` | `nor_cs_fsm_table` | – | 3 × 12-byte `fsm_on_event` entries `{u8 event, u8 next_state, fn, arg}` of the NOR flash chip-select FSM (object `0x20000658`: count `+4`, state `+5`, table `+8`): event 1 → 1 (no action), 2 → 2 `gpio_reset` (CS low), 3 → 0 `gpio_set` (CS high), on the CS pin object `0x200005F4` (GPIOE pin mask `0x8000`, the pin `nor_spi_xfer` toggles) |
 | `080290D4` | `rgb_led_channels` | 534 | 267 `u16`: frame-buffer byte (in `0x200005E0`) of each RGB LED colour channel, three per LED |
 | `0802935C` | `dma_it_tcif0` | – | `DMA_IT_TCIF0` in the StdPeriph `DMA_IT_*` constant array `0x0802934C`–`0x080293EB` (8 streams × FEIF, DMEIF, TEIF, HTIF, TCIF). A DMA driver object in `.data` points to it, 12 bytes after its stream register address and followed by its IRQ number: DMA2 Stream0 (`0x40026410`, word at `0x2000068C`, IRQ 56 after it) |
@@ -1926,6 +1942,8 @@ the next label in the generated source, so it can be shorter than the object.
 | `080293AC` | `dma_it_tcif4` | – | `DMA_IT_TCIF4` in the StdPeriph `DMA_IT_*` constant array `0x0802934C`–`0x080293EB` (8 streams × FEIF, DMEIF, TEIF, HTIF, TCIF). A DMA driver object in `.data` points to it, 12 bytes after its stream register address and followed by its IRQ number: DMA1 Stream4 (`0x40026070`, word at `0x200005D4`, IRQ 15) and DMA2 Stream4 (`0x40026470`, word at `0x20000A58`, IRQ 60) |
 | `080293C0` | `dma_it_tcif5` | – | `DMA_IT_TCIF5` in the StdPeriph `DMA_IT_*` constant array `0x0802934C`–`0x080293EB` (8 streams × FEIF, DMEIF, TEIF, HTIF, TCIF). A DMA driver object in `.data` points to it, 12 bytes after its stream register address and followed by its IRQ number: DMA1 Stream5 (`0x40026088`, word at `0x200009D8`, IRQ 16) |
 | `080293F3` | `str_user_session` | 32 | `"User Session"` padded with spaces to 32 bytes, the name `session_ctl_session_save` gives a new session |
+| `08029413` | `sysex_prefix_monostation` | 6 | `F0 00 20 29 01 61`, Mono Station commands in `sysex_dispatch` (`sysex-handlers.md`) |
+| `0802941C` | `calib_table` | 1600 | calibration self-test: 50 steps × 0x20 (word pointer, limits, type, step, setup and finish functions; `calib_*`) |
 | `08029A7C` | `scale_snap_table` | – | 16 u32, one per scale in the guide's order (natural minor, major, Dorian, Phrygian, Mixolydian, melodic minor, harmonic minor, Bebop Dorian, blues, minor pentatonic, Hungarian minor, Ukrainian Dorian, Marva, Todi, whole tone, chromatic = 0). 2 bits per semitone (bits 2n–2n+1 for pitch class n): 0 = in the scale, 1 = snap down a semitone, 2/3 = snap up (`scale_snap_note`). `router_on_cell` copies the selected word to the scale object `+4`, then `scale_find_bounds` recomputes the lowest/highest reachable note |
 | `08029ABC` | `level_curve_lo` | 34 | 17 `u16`: gain curve for `patch_level` (param id 18) × a scale, inputs below 1024 (64 per point, interpolated) |
 | `08029ADE` | `lfo_sync_shift` | 35 | 35 `s8`, the shift that goes with `lfo_sync_mul` (right if positive, left if negative) |
@@ -1937,18 +1955,28 @@ the next label in the generated source, so it can be shorter than the object.
 | `08029D28` | `lfo_rate_curve` | 130 | 65 `u16`: free-running LFO rate 0–255 -> phase increment, one point per 4 values, linearly interpolated |
 | `08029DCA` | `rgb_led_slots` | 164 | 82 `u16`: RGB LED -> its first channel in `rgb_led_channels` (LED `n` -> `3n`); the order is the RGB LED numbering of `inventory.md` |
 | `08029E72` | `mono_led_channels` | 42 | 21 `u16`: frame-buffer byte of each single-colour LED (`0xF6`–`0x10A`, after the RGB channels), `leds_render_mono` |
+| `08029E9C` | `default_step_range` | 1 | `0F` (steps 0–15), session template |
 | `08029E9D` | `button_matrix_bits` | – | 34 bytes: button id -> button-scan matrix bit, the exact inverse of `button_matrix_ids`; `button_feature_enabled` tests that bit in the bitmap `0x20000840` via `feature_bit` (also used by the SysEx handler in `sysex.s`) |
 | `08029EC0` | `gpio_port_bases` | 20 | GPIOA–GPIOE base addresses (`0x40020000` + `0x400` n), `sysex_dispatch` |
 | `08029ED4` | `sysex_prefix_mdlith` | 8 | `F0 4D 44 4C 49 54 48 00`, pad velocity-curve upload (`sysex-handlers.md`) |
+| `08029EDC` | `sysex_identity_request` | 6 | `F0 7E 00 06 01 F7`, MIDI Identity Request (device 0) |
+| `08029EE2` | `sysex_prefix_novation` | 5 | `F0 00 20 29 00`, product-independent commands: reboot and version (`sysex-handlers.md`) |
+| `08029EE7` | `sysex_identity_request_all` | 6 | `F0 7E 7F 06 01 F7`, MIDI Identity Request (all devices) |
 | `08029EED` | `sysex_reply_hdr` | 7 | `F0 00 20 29 00 00 00`, Novation header `sysex_reply_init` copies into a reply |
 | `08029EF4` | `midi_ports` | – | MIDI port objects: port 0 USB `0x20000FB0`, port 1 DIN `0x2000354C` (`sequencer.md` *MIDI in*) |
+| `08029F04` | `vt_merger` | 16 | per-track merger (0x28 bytes): `merger_note_on`, `merger_note_off` |
+| `08029F14` | `vt_recorder` | 52 | abstract recorder base `recorder_new` installs; slots 3–9 pure virtual |
+| `08029F48` | `sync_out_masks` | 28 | 7 `u32` tick masks of the analogue clock out per rate (`sequencer.md` *Sync out*) |
 | `08029F68` | `vt_track_patterns` | 4 | vtable: `track_patterns_on_cell` |
+| `08029F6C` | `ticks_per_step` | 32 | 8 `u32` `[2, 3, 4, 6, 8, 12, 16, 24]`, ticks per step for sync rate 0–7 |
 | `08029F94` | `vt_merge_stage` | 16 | vtable of the note-router merge stage (`sequencer.md`) |
+| `08029FA4` | `vt_player` | 4 | track player: `player_on_cell` (`sequencer.md` *Track player*) |
 | `08029FA8` | `pw_mod_depth_curve` | 132 | `s8` curve (−90…+90) that `synth_update_osc1`/`synth_update_osc2` look up for the pulse-width mod depth params |
 | `0802A02C` | `synth_update_fns` | 52 | 13 synth section update functions, `synth_update_glide` … `synth_update_modes`, then 3 × `synth_update_nop` |
 | `0802A0BE` | `mono_led_sources` | 164 | `mono_leds_compose` gather table for the 21 single-colour LEDs |
 | `0802A168` | `view_code_slots` | 116 | 4 bytes per view code; byte 0 = overlay slot in `ui_root +0xD4` (`session-format.md`) |
 | `0802A1E4` | `param_lanes` | 162 | param id -> (track, automation lane), the record hub's table (`sequencer.md`) |
+| `0802A286` | `modseq_weights` | 576 | 12 rows × 24 byte pairs: rows 0–7 are the Mod Seq smooth crossfade weights (sum 48) per sync rate (`modseq_output`, `session-format.md`); rows 8–11 sum to 8, use not traced |
 | `0802A4C6` | `mux_addr_patterns` | 16 | 8 `u16` GPIOB patterns, address 0–7 on PB6–PB8 (`n << 6`): pattern table (`+8`) of the CV mux address pin group `0x20000980` (`inventory.md`) |
 | `0802A4D6` | `sh_sel_0_0` | – | S&H mux select `{address 0, chip 0}`, the `sel` of an S&H table entry (`0x20000880`, `inventory.md` 1.3); `TIM6_DAC_IRQHandler` ends the second half at this entry |
 | `0802A4D8` | `sh_sel_0_3` | – | S&H mux select `{address 3, chip 0}`, the `sel` of an S&H table entry (`0x20000880`, `inventory.md` 1.3) |
@@ -1976,6 +2004,7 @@ the next label in the generated source, so it can be shorter than the object.
 | `0802A520` | `sh_sel_0_4` | – | S&H mux select `{address 4, chip 0}`, the `sel` of an S&H table entry (`0x20000880`, `inventory.md` 1.3) |
 | `0802A524` | `osc_period_octave` | 196 | 49 `u32`: one octave of oscillator timer periods in quarter-semitone steps (each entry × 2^(−1/48)), interpolated by `osc_pitch_cv_update` |
 | `0802A5E8` | `sine_quarter` | 66 | quarter-wave table of `sine_lookup` |
+| `0802A62A` | `param_table` | 608 | 76 × 8-byte synth param records: patch offset, range, centre, CC/NRPN (`session-format.md`, `tools/patchbank.py` `PARAMS`) |
 | `0802A88A` | `led_curve_1` | 256 | the same 256 bytes again; slot 1 of the curve table (`.data` initialiser) |
 | `0802A98A` | `led_curve_2` | 266 | the same 256 bytes again (+10 zero bytes); slot 2 of the curve table |
 | `0802AA94` | `vt_step_view` | 64 | view vtable, slots `step_view_*` |
@@ -1987,6 +2016,10 @@ the next label in the generated source, so it can be shorter than the object.
 | `0802ADB4` | `vt_pattern_settings_view` | 56 | view vtable, slots `pattern_settings_*` |
 | `0802ADEC` | `vt_osc_view` | 64 | 8-byte header, then the osc view vtable at `0x0802ADF4` (`osc_view_pot`, `view_ab_on_event`, `osc_view_on_cell`) |
 | `0802AE2C` | `_ZSt7nothrow` | 1 | `std::nothrow`, the second argument of every `operator new(size, nothrow)` |
+| `0802AE30` | `_global_impure_ptr` | 4 | newlib-nano: points at `impure_data` |
+| `0802AE34` | `__sf_fake_stdin` | 32 | newlib-nano fake `FILE` |
+| `0802AE54` | `__sf_fake_stdout` | 32 | newlib-nano fake `FILE` |
+| `0802AE74` | `__sf_fake_stderr` | 32 | newlib-nano fake `FILE` |
 | `0802AE94` | `str_printf_flags` | – | `"#-0+ "`, newlib-nano `_vfprintf_r` |
 | `0802AE9A` | `str_printf_lengths` | – | `"hlL"`, `_vfprintf_r` |
 | `0802AE9E` | `str_printf_floats` | – | `"efgEFG"`, `_vfprintf_r` |

@@ -27,7 +27,7 @@ The app is C++ with no symbols, so this diagram comes from the vtables
 
 ## Note and parameter path
 
-The note path from `docs/sequencer.md` *Note path*. Each link is labelled with the field
+The note path from `docs/sequencer.md` *Note routing*. Each link is labelled with the field
 in the object that holds the pointer.
 
 ```mermaid
@@ -296,9 +296,9 @@ interface isn't known yet, so they are left out.
 
 ## Views
 
-`View` (`vt_view_base`, `08027638`) has slots 0–9. The defaults are no-ops, except
-`view_rgb_leds` and `view_mono_leds`. A view lists only the slots it overrides. Two
-layouts derive from it, and both put an `ICellObserver` base at `+0xC`:
+Slot meanings, defaults and the root view slots are in `docs/source-map.md` *Views*.
+`View` (`vt_view_base`, `08027638`) has slots 0–9; a view below lists only the slots it
+overrides. Two layouts derive from it, and both put an `ICellObserver` base at `+0xC`:
 
 - **`ObservingView`:** slot 10 is `on_cell` (or render). `vt_container_view`
   (`08027BA4`) is this layout with slot 10 left pure (`__cxa_pure_virtual`).
@@ -307,7 +307,7 @@ layouts derive from it, and both put an `ICellObserver` base at `+0xC`:
   in `ModeView`) and slot 11 is `on_cell`. What the constant means isn't known.
 
 `UiRoot` is not a `View`. It has its own 8 input slots and `on_cell` at slot 8, with an
-`ICellObserver` base at `+4`. It holds the root views by slot (`source-map.md` *Views*).
+`ICellObserver` base at `+4`. It holds the root views by slot.
 `ModeView` forwards input to one child view at a time.
 
 ```mermaid

@@ -8,7 +8,7 @@ Novation released three Mono Station firmware versions. The list and the feature
 | 1.1 | 745 | by June 2017 | 9 | `url: null`; `/api/v2/firmwares/9/file` returned HTTP 500 (2026-10-25) |
 | 1.2 | 800 | 2018-06-15 | 8 | bundled in Components as `monostation-firmware-800.syx` |
 
-The build number is what the firmware reports in its `0x70` version reply and in the image header (`docs/sysex-handlers.md`); Components compares it to decide whether to offer an update. Our mods use builds between 745 and 800 (`README.md`).
+The build number is what the firmware reports in its `0x70` version reply and in the image header (`docs/sysex-handlers.md`); Components compares it to decide whether to offer an update. Our mods use builds 750–799, so Components still offers stock 1.2 (`docs/release-test.md`).
 
 Where the 1.2 file comes from: Components 1.72.5 bundles it as `resources/firmwares/monostation-firmware-800.syx` inside `app.asar` (Windows installer → Squirrel `Components-1.72.5-full.nupkg` → `lib/net45/resources/app.asar`), with a second copy at `resources/mididata/`. Components' constant `MONOSTATION_LATEST_FIRMWARE_VERSION` is 800, and its upstream URL is `https://s3-eu-west-1.amazonaws.com/circuit-content/f53741d5f0a40a808d29ac4f137222a4e0974ce3/monostation-firmware-800.syx`. The same `app.asar` holds the init session `session_32.monostationsession`. A script to extract them reproducibly is #50; finding the older builds is #51.
 

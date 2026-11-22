@@ -1,6 +1,6 @@
 # Session SysEx transport
 
-How sessions travel over SysEx. The layout of a single session image is in `docs/session-format.md`. Implementation: `tools/sessionsyx.py`. Reference dumps: the two `*Sessions*.syx` files in the YBC "Big City Flippn'Grooves" soundpack (3,484,838 bytes each).
+How sessions travel over SysEx. The layout of a single session image is in `docs/session-format.md`. Implementation: `tools/sessionsyx.py`. Reference dumps: the two `*Sessions*.syx` files in the YBC "Big City Flippin' Grooves" soundpack (3,484,838 bytes each).
 
 ## Messages
 
@@ -51,27 +51,31 @@ From `0x78` dumps of a stock unit (bootloader 740, firmware 800), cross-checked 
 | `0x0044`–`0x0FFF` | `FF` |
 | `0x1000`–`0x1017` | the 24-byte **System Settings record**: `08 00 00 00 00 00 00 00 2E 02 00 00 00 00 00 00 01 00 00 00 FF 00 00 00` on this unit. Layout below. |
 | `0x1018`–`0x1FFF` | `FF` |
-| `0x2000`–`0x12000` | 128 patch slots × 512 bytes. On this unit, slots 64–127 all hold `Initial Patch`. |
-| `0x12000`–`0x2E8000` | 33 session images |
-| `0x2E8000`–`0x1000000` | all `FF` (scanned completely). There is no factory bank in external flash. |
+| `0x2000`–`0x12000` | 128 patch slots × 512 bytes (`docs/sysex-spec.md` *Patch store*). On this unit, slots 64–127 all hold `Initial Patch`. |
+| `0x12000`–`0x2E8000` | 33 session images, image *n* at `0x12000 + n × 0x16000` |
+| `0x2E8000`–`0x7FEFFF` | all `FF` (scanned completely) |
+| `0x7FF000`–`0x7FFFFF` | `FF` on stock. Mod builds keep the mod settings store in this 4 KiB subsector (`docs/mod-settings.md`). |
+| `0x800000`–`0x1000000` | all `FF` (past the chip, see below) |
+
+There is no separate factory bank: the factory patches are just what the unit shipped with in the `0x2000` slots.
 
 The bootloader returned `FF` at `0x1000000`, `0x2000000` and `0x7FFFF000`, so the read doesn't wrap at 16 MiB. **It doesn't map MCU memory:** `0x0800C000` (the app's vector table, the control), `0x08000000` (bootloader), `0x1FFF0000`, `0x1FFF7800`, `0x1FFFC000`, `0x10000000`, `0x20000000` and `0x40024000` all came back as valid transfers full of `00`. Why these give `00` and the others `FF` is unknown. The app's `p 0x40` read stops at `0x800000` (see `docs/sysex-handlers.md`), which suggests an 8 MiB (64 Mbit) chip.
 
 ### Settings record (`0x1000`)
 
-The System Settings page (hold Shift while switching on; Play exits) is stored here. Mapped on hardware by changing one setting per power cycle and reading the record with `p 0x40` op 2 after each one. The record is written **only at power-off**: after Play it was still unchanged, and after a power cycle it had changed. The boot code `FUN_0800e1f8` reads it with `FUN_0801aef4(1, 0, buf, 0x18)` (sector 1, offset 0, 24 bytes).
+The System Settings page (hold Shift while switching on; Play exits) is stored here. Mapped on hardware by changing one setting per power cycle and reading the record with `p 0x40` op 2 after each one. The record is written **only at power-off**: after Play it was still unchanged, and after a power cycle it had changed. The boot code `app_construct` reads it with `ext_flash_read(1, 0, buf, 0x18)` (sector 1, offset 0, 24 bytes).
 
 | offset | content |
 |--------|---------|
-| `0x00` | `08`. Unknown. At boot, `FUN_0800e1f8` checks it: if it is above `0x1F`, a field gets cleared, which reads like a sanity check for an erased (`FF`) record. |
-| `0x08` | flags. bit 2 = Note Tx on, bit 3 = Note Rx on, bit 4 = Clock Rx **off**, bit 5 = Clock Tx **off**, bit 6 = CC Tx **off**, bit 7 = CC Rx **off**. bit 0 = Save **locked** (Shift + Save at power-on toggles it), bit 1 = Fixed Velocity (Shift + Velocity). Bit 1 was set and bit 0 clear in every reading. Both come from the code (`docs/sequencer.md` *MIDI settings cell*). |
-| `0x09` | bits 0–2 = clock out rate (pad 18, 2 ppqn → 2; pad 20, 8 ppqn → 4; so probably pads 17–21 → 1–5), bit 3 = pot pickup on |
+| `0x00` | `08`. Unknown. At boot, `app_construct` checks it: if it is above `0x1F`, a field gets cleared, which reads like a sanity check for an erased (`FF`) record. |
+| `0x08` | MIDI flags: Save lock, Fixed Velocity, Note/CC/Clock Rx/Tx (bits in `docs/sequencer.md` *MIDI settings*). Bit 1 was set and bit 0 clear in every reading. |
+| `0x09` | bits 0–2 = clock out rate: pads 17–21 → 1–5 = 1, 2, 4, 8, 24 PPQN (`settings_view_pad_down`, `docs/sequencer.md` *Sync out*); bit 3 = pot pickup on |
 | `0x0C` | Osc 1 MIDI channel, 0-based (ch 3 → `02`) |
 | `0x10` | Osc 2 MIDI channel, 0-based. Inferred: it reads `01` while Osc 2 is on ch 2, but it wasn't changed during the test. |
 | `0x14` | `FF`. Unknown. |
 | others | `00` |
 
-The Rx/Tx flags mix polarities: Note Rx/Tx are "on" bits, while CC and Clock are "off" bits. The defaults (Note, CC and Clock Rx on, Clock Tx off) therefore read `0x2E`. Readings are in `~/ms-dumps2/settings-1000.tsv`. The unit was restored afterwards, and the final record matches the first one byte for byte.
+The Rx/Tx flags mix polarities: Note Rx/Tx are "on" bits, while CC and Clock are "off" bits. The defaults (Note, CC and Clock Rx on, Clock Tx off) therefore read `0x2E`. The readings (`settings-1000.tsv`) are not kept in the repo. The unit was restored afterwards, and the final record matches the first one byte for byte.
 
 ## Requesting and sending (Components `k0`, `decode-worker-*.js`)
 
@@ -80,10 +84,19 @@ These transfers are handled by the **bootloader**, not the app. The app's `F0 00
 - **Download:** the host sends `F0 00 20 29 00 78 <start: 8 nibbles> <length: 8 nibbles> F7` (command 120). The device answers with a `0x77` header that echoes the start and length; Components rejects any other values. The `0x79` blocks and the `0x7A` CRC trailer follow.
 - **Upload:** the host sends the `0x77` header, then one `0x79` block each time the device sends a flow-control message. That message is either `0x7B` (8-nibble counter at bytes 6–13) or `0x75` (16-bit counter at bytes 7–8); a repeated counter value is ignored. At the end the device sends `0x7A` with its own CRC-32, and the host compares it with the CRC of what it sent.
 - A patch-bank upload pads each 126-byte patch to 512 bytes (`patchLength`) before framing.
-- **Resolved (hardware): the upload works for the patch area.** `0x2000`/`0x8000` (slots 1–64) uploaded through the bootloader; the unit's `0x7A` CRC matched, and the read-back matched byte for byte, the slots after it untouched (2026-11-21, firmware 751; `flasher/.../Upload.kt`). Components sends the header and the first block together, then one message per new flow counter, its own `0x7A` last.
+- Components sends the header and the first block together, then one message per new flow counter, its own `0x7A` last.
+- **The bootloader takes any start and length** (hardware). Each of these downloads came back with a matching header and a valid CRC: one slot (`0x2000`/`0x200`), one session (`0x12000`/`0x16000`), all 128 slots (`0x2000`/`0x10000`), `0x0`/`0x2000`, and 4 KiB to 1 MiB reads anywhere up to `0x7FFFF000`.
+- **Uploads work.** Our flasher (`flasher/` `Upload.kt` `uploadToUnit`) writes in one bootloader visit, then reads back and compares:
+  - the patch area `0x2000`/`0x8000` (slots 1–64). On hardware (2026-11-21, firmware 751) the unit's `0x7A` CRC matched, the read-back matched byte for byte, and the slots after it were untouched;
+  - session images, each alone at `0x12000 + n × 0x16000`. Tried on the unit with session 1 and the `INIT` image (commit `d874ad6`);
+  - the mod settings store at `0x7FF000`, for mod builds (`docs/mod-settings.md`).
+
+  `Backup.kt` reads the same three areas into a `.monostationpack`.
+
+## Practical notes
+
+- On Linux, receive big dumps from the ALSA rawmidi device (`amidi`, or `/dev/snd/midiC*D*`). Through the ALSA sequencer (rtmidi/mido) a 3 MB session dump lost 16 blocks to input overruns. Poll the rawmidi device before sending the request: input starts on the first poll or read, and the fast `0x77` header was lost once when the request went out first.
 
 ## Open
 
-- **Resolved (hardware): the bootloader takes any start and length.** Each of these came back with a matching header and a valid CRC: one slot (`0x2000`/`0x200`), one session (`0x12000`/`0x16000`), all 128 slots (`0x2000`/`0x10000`), `0x0`/`0x2000`, and 4 KiB to 1 MiB reads anywhere up to `0x7FFFF000`.
 - What the `0x0`–`0x44` calibration-like table means, and the unknown bytes of the settings record at `0x1000` (see *Storage map*).
-- On Linux, receive big dumps from the ALSA rawmidi device (`amidi`, or `/dev/snd/midiC*D*`). Through the ALSA sequencer (rtmidi/mido) a 3 MB session dump lost 16 blocks to input overruns. Poll the rawmidi device before sending the request: input starts on the first poll or read, and the fast `0x77` header was lost once when the request went out first.

@@ -12,6 +12,6 @@
 # each time the track's pattern loops (in the dual view, each Osc track on its own loop).
 base = 800
 # Below 800 (firmware 1.2) and above 745 (1.1), so Components offers to restore stock 1.2.
-version = 750
+version = 751
 sources = ["randomise.c"]
 replace = ["ui_button_event", "ui_root_button_up", "input_poll_task", "seq_step_advance"]

@@ -3,7 +3,7 @@
 Two lists:
 
 1. **Hardware**: everything on the unit that firmware can read or drive: panel controls, LEDs, synth circuits, jacks, and the MCU peripherals and storage behind them.
-2. **Firmware features**: everything the stock firmware (build 800, "firmware 1.2") implements in software, plus what this project's patches and overlays add.
+2. **Firmware features**: everything the stock firmware (build 800, "firmware 1.2") implements in software, plus what this project's overlays add.
 
 Each entry says how far it is understood and where the details are. Sources:
 - **UG**: the user guide (`private/docs/circuit-mono-station-ug-en-v1-2.pdf`). Bracketed numbers like [16] are its panel callouts (pp. 13–19).
@@ -16,7 +16,7 @@ Status: **known** = traced in the code (and usually confirmed on hardware); **pa
 
 ### 1.1 Panel inputs
 
-The firmware sees every control as an id in one event stream. `control_dispatch` (`0x0801E310`) routes ids below `0x20` to pads, `0x20`–`0x31` to knobs (18 ids) and `0x32`–`0x35` to signed pairs. Views get them through vtable slots 0–6 (pad down/up, button down/up, encoder, pot, fader; `docs/source-map.md` *Views*). The stock firmware also has `printf` log lines for each kind (`"Pad %d changed state…"` etc.), but `_write` discards them (`docs/firmware-map.md` *UI input*). Which id is which physical control isn't mapped yet; logging the events (point `_write` or `button_event`'s `sysex_send_debug` at SysEx) would map them on a unit.
+The firmware sees every control as an id in one event stream. `control_dispatch` (`0x0801E310`) routes ids below `0x20` to pads, `0x20`–`0x31` to knobs (18 ids) and `0x32`–`0x35` to signed pairs. Views get them through vtable slots 0–6 (pad down/up, button down/up, encoder, pot, fader; `docs/source-map.md` *Views*). The stock firmware also has `printf` log lines for each kind (`"Pad %d changed state…"` etc.), but `_write` discards them (`docs/firmware-map.md` *UI input*). Which id is which physical control: *Control ids* below.
 
 | Control | Count | UG | Firmware path | Status |
 |---------|------:|----|---------------|--------|
@@ -24,8 +24,8 @@ The firmware sees every control as an id in one event stream. `control_dispatch`
 | Rotary pots | 16: Volume [1], Tempo/Swing [2], Coarse [18], Fine/PW [19], LFO Rate [20], mixer Osc 1/Osc 2/Sub/Noise/Audio In/Ring [23–28], Frequency [32], Resonance [33], Overdrive [34], Distortion Level [37], Mod Depth [40] | | ADC1 + DMA → `adc_filter_push` (moving average) → `pots_scan` (threshold, `map_range`) → `control_dispatch` ids `0x20`–`0x2D` (pots 0–13, callback `0x20002F34`) → `ui_root_pot` → section view → `param_set` | known (ids in *Control ids* below, mapped on the unit 2026-10-28). `pots_scan` descriptors: `0x08027A98` (16 entries: ids `0x20`, `0x21`, `0x24`–`0x31`, so 12 pots + 4 faders), `0x080274FC` (Osc Coarse and Fine/PW, ids `0x22`, `0x23`, own curve `0x08027988`). Tempo/Swing and Mod Depth are endless dual-wiper encoders: ids `0x32`/`0x33` and `0x34`/`0x35` (descriptors `0x08026ECC`) give signed deltas (`input_poll_task` `0x0801BE20`). **Volume is digital:** pot `0x20` has no patch param; `control_dispatch` writes it to the master-volume target (`0x200028C4` byte 0), and `volume_cv_step` slews it to the VCA CV. Pot pickup (setting byte `0x09` bit 3) and the Osc coarse/fine ±`0x14` pickup window are known. |
 | Envelope faders (A, D, S, R) | 4 | [29] | `control_dispatch` ids `0x2E`–`0x31` (callback `0x20003124`) → `ui_root_fader` → envelope view → params `0x20`–`0x23` | known |
 | Buttons | 34 lit buttons: Tap [3], Osc 1 / Osc 2 / Mod Seq [5], Note / Velocity / Gate [6], Pattern Settings [7], Scales [8], Patterns [9], Patches [10], Play, Record [11], Oct down / up [12], Clear [13], Save, Sessions [14], Shift [15], Range [16], Waveform [17], LFO Wave [21], LFO Sync [22], Filter Shape [30], Slope [31], Bypass [35], Distortion Type [36], Mod Source [38], 6 Mod Destination buttons [39] | | `ui_button_event` (`0x08011FBC`) routes to the active view or global handlers; long/short press via held-button timers (`ui_root_slot4`); Shift functions per view | known; ids in *Control ids* below (`0x00`–`0x21`, mapped on the unit). The main loop's button scan maps matrix bits to ids with the table at `0x08026E8A` (64 bits, `0x22` = no button) |
-| Power switch (soft, rear) | 1 | [10] | `power_calib_task` (`0x0801C208`, 1 kHz soft timer): long-press detect; shutdown fades the master volume out, raises GPIOC pin 9 (mute), runs `bootloader_handover` (`0x08024940`: stops peripherals and masks every NVIC IRQ; despite the name it's a shared quiesce routine), drops the GPIOE pin 0 power hold, then loops on IWDG refresh + WFI in stop mode | known |
-| Boot key combos | | p. 90 | Shift at power-on → System Settings view; Shift + Save → toggle the Save lock (MIDI settings byte 0 bit 0); Shift + Clear → start with a blank session instead of the last one (`app_construct` skips the session load); Scales + Note + Velocity → bootloader (checked by the bootloader, `docs/bootloader.md`) | known |
+| Power switch (soft, rear) | 1 | [10] | `power_calib_task` (`0x0801C208`, 1 kHz soft timer): long-press detect; shutdown fades the master volume out, raises GPIOC pin 9 (mute), runs `irq_quiesce` (`0x08024940`: stops peripherals and masks every NVIC IRQ, a shared quiesce routine), drops the GPIOE pin 0 power hold, then loops on IWDG refresh + WFI in stop mode | known |
+| Boot key combos | | p. 90 | `app_construct` picks a boot combo index: 0 = Shift + Clear → start with a blank session instead of the last one (it skips the session load; the blank session gets the `Classic Mono` patch); 1 = Shift + Save → toggle the Save lock (MIDI settings byte 0 bit 0); 2 = Shift alone → System Settings view. Scales + Note + Velocity → bootloader (checked by the bootloader, `docs/bootloader.md`) | known (`boot_combo_blank_session`, `docs/source-map.md`) |
 
 #### Control ids
 
@@ -159,7 +159,7 @@ Switch word `0x20002F80` (24 bits over SPI3): bits 0–1 and 13–15 carry the b
 | MIDI IN / OUT / THRU (3.5 mm TRS) | [3] | USART1 (`0x40011000`, ISR `0x08023FE1`). THRU is probably hardware. | known; DIN is parser port 1 (`docs/sequencer.md` *MIDI in*) |
 | USB-B (MIDI class compliant) | [8] | USB OTG_FS (`0x50000000`, ISR `0x0801EEFC`), ST USB device library + USB-MIDI class. The descriptors also name `"AUDIO Interface"`, but the UG says USB carries no audio. OTG_HS isn't used: no code references `0x40040000`, and its vector just branches to the FS handler. | known |
 | CLOCK OUT (5 V) | [4] | TIM2 one-shot pulse per tick mask (1/2/4/8/24 PPQN, `docs/sequencer.md` *Sync out*) | known |
-| CLOCK IN (2 PPQN) | [5] | edge interrupt (EXTI15_10, ISR `0x08023A79`), 12 ticks per pulse, tempo by least-squares fit | known |
+| CLOCK IN (2 PPQN) | [5] | each pulse adds 12 ticks to the clock engine, tempo by least-squares fit (`clock_timestamp_push`, `clock_tempo_fit`; `docs/sequencer.md` *External sync*). Not the EXTI15_10 ISR (`0x08023A79`): that one handles only EXTI12 for the calibration frequency measurement (state `0x2000339C`, enabled by `calib_start` with TIM9). | partial: the input pin and edge source aren't traced |
 | NOTE OUT CV (1 V/oct) and GATE (5 V) | [6] | from the voice that session byte `0x155DC` (RAM `0x20003205`) picks: 0 = Osc 1 (default, the only one the user guide mentions; in paraphonic Mode 2 the gate also follows Osc 2), 1 = Osc 2, 2 = track 2 (Mod Seq). Written in `synth_engine_update`: CV on the other SPI3 DAC channel (`(pitch − 0x180000) >> 8 × 0x767 / 10000 + 9`), gate via `output_pin_set` | known; Shift + Sessions opens the source view (select3, `ui_root +0x44`, pads 1–3 = Osc 1 / Osc 2 / Mod Seq), undocumented in the guide; unverified on hardware |
 | AUX CV (±5 V) | [7] | SPI3 DAC channel, source chosen in the mod matrix (see *Aux CV output*) | known |
 | DC power 12 V | [9] | — | n/a |
@@ -175,7 +175,7 @@ Switch word `0x20002F80` (24 bits over SPI3): bits 0–1 and 13–15 carry the b
 | External SPI NOR flash (8 MiB) | calibration, settings record, 128 patch slots × 512 B (64 used), 33 sessions × 90,112 B | known (`docs/session-transport.md` *Storage map*); async DMA driver `nor_async_*` |
 | Hardware RNG `0x50060800` | random steps, Mutate | known (`rng_read`) |
 | Timers | TIM5 10 kHz time base (soft timers, sequencer, 2 kHz engine); TIM2 clock out; TIM6 DAC clock; TIM10 LED scan; TIM1/TIM3 osc pitch; TIM8/9/11/14 misc | partial |
-| SPI2, SPI3, SPI4 | SPI2 (PB13–15, AF5, TX on DMA1 Stream 4, struct `0x200005A0`): LEDs. SPI3 (PC10–12, AF6, struct `0x20000A14`, chip select in `DMA1_Stream2_IRQHandler`): synth SPI DAC. SPI4 (PE12–14, AF5, struct `0x2000051C`): NOR flash. SPI1 isn't used; `spi_init` only compares against its base to pick the APB2 clock. | known |
+| SPI2, SPI3, SPI4 | SPI2 (PB13–15, AF5, TX on DMA1 Stream 4, struct `0x200005A0`): LEDs. SPI3 (PC10–12, AF6, struct `0x20000A14`, chip select in `DMA1_Stream2_IRQHandler`): synth SPI DAC. SPI4 (PE12–14, AF5, struct `0x2000051C`): NOR flash. SPI1 isn't used; `spi_init` compares against the SPI1 and SPI4 bases only to pick the APB2 clock (else APB1). | known |
 | ADC1 + DMA | pots, faders, calibration measurements | partial |
 | DAC `0x40007400` | channel 1: modulation S&H mux (TIM6); channel 2: oscillator pitch S&H (§1.3) | known |
 | USART6 | not used: it appears only in the inlined `USART_Init` APB2 clock compare (`0x0800CA28`/`0x0800CA7E`). USART1 (PA9/PA10, AF7, 31,250 baud) is the only UART. | known |
@@ -227,7 +227,7 @@ Detail: `docs/sequencer.md`, `docs/session-format.md`.
 | Mod Seq track | per-step mod value as a matrix source; Smooth (Shift + Mod Seq) interpolates | partial |
 | Real-time recording | notes quantised to the nearest step (half-step rule), gate measured in micro-steps, velocity on Osc tracks | known (`docs/sequencer.md` *Recording*) |
 | Knob automation | 42 lanes on track 0, 12 on track 1, 96 values per lane per pattern; interpolation at fast rates | known |
-| Step editing | enter, delete, modify steps in Note / Velocity / Gate / Glide views | known (`docs/sequencer.md` *Step editing*); the step-edit writers of the patch change and per-step automation are open |
+| Step editing | enter, delete, modify steps in Note / Velocity / Gate / Glide views | known (`docs/sequencer.md` *Step editing*, including the patch change and per-step automation through `pattern_ctl_on_cell`) |
 | Clear, Duplicate (Shift + Clear) | steps, patterns, patches, sessions, automation | partial (`pattern_ctl_on_cell`) |
 | Mutate (Shift + Pattern Settings) | shuffles the steps between the pattern's start and end point (`pattern_ctl_on_cell`): for each position, `rng_read` picks a step from the remaining range and the two swap whole (note, velocity, gate, glide and the six micro-step cells on every page), so the notes stay but move. `seq_track_position` also uses the RNG for the random playback direction. | known |
 | Pattern octave (Shift + Oct) | transpose a recorded pattern | known |
@@ -263,14 +263,17 @@ Detail: `docs/sequencer.md`, `docs/session-format.md`.
 
 ### 2.7 Added by this project
 
-| Name | What it does |
-|------|--------------|
+What each overlay does for the user: `README.md` and `docs/release-notes.md`; the details are in each `overlay.toml` header.
+
+| Name | What it is |
+|------|------------|
+| `overlays/randomise` | Mutate: mild per-field Mutate, patch randomiser, hold to repeat (#13, #45, #60, #65, #66) |
+| `overlays/transpose` | live transpose of the Osc sequences (#21) |
+| `overlays/sequences` | pattern chain sequences per track (#20) |
+| `overlays/drive` | Overdrive and Distortion amounts (#61), set by mod settings (`docs/mod-settings.md`) |
+| `overlays/settings` | the mod settings store and its SysEx `7C` (#68, `docs/mod-settings.md`) |
+| `overlays/notesink_cpp` | C++ overlay proof (version 751) |
 | `tests/fixtures/patch_hello`, `overlay_hello`, `overlay_hello_c` | test fixtures: report version 801 |
-| `overlays/randomise` | #13 per-field Mutate (gate, glide, velocity, pitch), #45 patch randomiser (Mutate in the Patches view: a medium random step from the current patch, gliding over 500 ms) and #60 mild Mutate (steps move one step from where they are, the patch a bit more) |
-| `overlays/transpose` | #21 live transpose of the Osc sequences by scale degrees |
-| `overlays/drive` | stronger Overdrive and Distortion (×3 swing, the overdrive CV `0x20003378` swept to 400, every driven distortion stage at full swing; types 1 and 3 remapped to reach the DAC's end at full Level); how far is set by mod settings (`0x0101` Overdrive, `0x0102`–`0x0104` Distortion per panel type, 0 = stock) |
-| `overlays/settings` | mod settings store (#68): reads the store at `0x7FF000` at boot, `mod_setting(id)`, SysEx `7C` describe/get/set (`docs/mod-settings.md`) |
-| `overlays/sequences` | #20 pattern chain sequences per track (Shift + pattern taps while stopped; Shift + Patterns = Append), saved in the session |
 | `tools/ctllog.py` | turns on the stock debug reports and logs or maps control ids |
 
 ## Open items collected
