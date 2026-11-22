@@ -67,12 +67,12 @@ The System Settings page (hold Shift while switching on; Play exits) is stored h
 
 | offset | content |
 |--------|---------|
-| `0x00` | `08`. Unknown. At boot, `app_construct` checks it: if it is above `0x1F`, a field gets cleared, which reads like a sanity check for an erased (`FF`) record. |
-| `0x08` | MIDI flags: Save lock, Fixed Velocity, Note/CC/Clock Rx/Tx (bits in `docs/sequencer.md` *MIDI settings*). Bit 1 was set and bit 0 clear in every reading. |
+| `0x00` | Audio In gain (`08` = mid-scale). The settings unit (`0x08018EE8`) copies it, clamped to 31, to `0x2000086C`, the switch-word gain byte that Shift + Audio In also writes (`docs/inventory.md`). At boot `app_construct` rejects values above `0x1F` (an erased `FF` record). From code; not yet changed on hardware. |
+| `0x08` | MIDI flags: Save lock, Fixed Velocity, Note/CC/Clock Rx/Tx (bits in `docs/sequencer.md` *MIDI settings*). Bit 1 (Fixed Velocity) was set and bit 0 clear in every reading. |
 | `0x09` | bits 0–2 = clock out rate: pads 17–21 → 1–5 = 1, 2, 4, 8, 24 PPQN (`settings_view_pad_down`, `docs/sequencer.md` *Sync out*); bit 3 = pot pickup on |
 | `0x0C` | Osc 1 MIDI channel, 0-based (ch 3 → `02`) |
-| `0x10` | Osc 2 MIDI channel, 0-based. Inferred: it reads `01` while Osc 2 is on ch 2, but it wasn't changed during the test. |
-| `0x14` | `FF`. Unknown. |
+| `0x10` | Osc 2 MIDI channel, 0-based. `midi_apply_settings` copies it to the Osc 2 note channel on MIDI in and out (`docs/midi.md`); not changed on hardware. |
+| `0x14` | `FF`. Unknown: `settings_save` compares it (so it is saved state), but no reader was found. `0x04` is the same. |
 | others | `00` |
 
 The Rx/Tx flags mix polarities: Note Rx/Tx are "on" bits, while CC and Clock are "off" bits. The defaults (Note, CC and Clock Rx on, Clock Tx off) therefore read `0x2E`. The readings (`settings-1000.tsv`) are not kept in the repo. The unit was restored afterwards, and the final record matches the first one byte for byte.

@@ -143,7 +143,7 @@ It writes the new pattern/step through the cells and returns 1 when the pattern 
 
 ## MIDI clock and transport
 
-All objects are built in `app_construct`.
+All objects are built in `app_construct`. The user-level MIDI chart (channels, what is received and sent, free CCs) is `docs/midi.md`; triplet research is `docs/triplets.md`.
 
 ### MIDI settings
 

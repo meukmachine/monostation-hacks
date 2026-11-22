@@ -239,6 +239,10 @@ For owners:
   what is in a session and how session backups travel over SysEx.
 - [Patch slots 64–127 on the unit](docs/hw-test-patch-slots.md): what the hidden slots
   hold and what program change can reach.
+- [MIDI implementation](docs/midi.md): what the unit sends and receives, on which
+  channels, and which CCs are free.
+- [Triplets](docs/triplets.md): the triplet rates the stock sequencer already has, and
+  research for triplets inside a pattern (#62).
 
 For modders:
 
